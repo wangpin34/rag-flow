@@ -56,3 +56,39 @@ model QueryHistory {
   
   @@map("query_history")
 }
+
+// Provider model for AI model providers
+model Provider {
+  id          Int      @id @default(autoincrement())
+  name        String   @unique  // e.g., "OpenAI", "Anthropic", "Cohere", "Local"
+  apiEndpoint String?  // Base API endpoint URL
+  apiKeyName  String?  // Environment variable name for API key
+  isActive    Boolean  @default(true)
+  config      String?  // JSON string for provider-specific configuration
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  models      Model[]
+  
+  @@map("providers")
+}
+
+// Model model for AI models
+model Model {
+  id              Int      @id @default(autoincrement())
+  providerId      Int
+  provider        Provider @relation(fields: [providerId], references: [id], onDelete: Cascade)
+  name            String   // e.g., "gpt-4", "claude-3-opus", "text-embedding-3-small"
+  displayName     String?  // User-friendly name
+  modelType       String   // "embedding", "chat", "completion"
+  contextWindow   Int?     // Maximum context window size
+  embeddingDim    Int?     // Embedding dimension (for embedding models)
+  isActive        Boolean  @default(true)
+  config          String?  // JSON string for model-specific configuration
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  @@map("models")
+  @@unique([providerId, name])
+  @@index([providerId])
+  @@index([modelType])
+}

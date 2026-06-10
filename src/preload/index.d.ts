@@ -20,6 +20,30 @@ declare global {
         deleteEmbedding: (documentId: number) => Promise<void>;
         getEmbeddingCount: () => Promise<number>;
       };
+      provider: {
+        create: (data: any) => Promise<any>;
+        findById: (id: number) => Promise<any>;
+        findByName: (name: string) => Promise<any>;
+        findAll: (includeInactive?: boolean) => Promise<any[]>;
+        update: (id: number, data: any) => Promise<any>;
+        delete: (id: number) => Promise<any>;
+        toggleActive: (id: number) => Promise<any>;
+        getStatistics: () => Promise<any>;
+      };
+      model: {
+        create: (data: any) => Promise<any>;
+        findById: (id: number) => Promise<any>;
+        findByProviderAndName: (providerId: number, name: string) => Promise<any>;
+        findAll: (options?: any) => Promise<any[]>;
+        findByProviderId: (providerId: number, includeInactive?: boolean) => Promise<any[]>;
+        findByType: (modelType: string, includeInactive?: boolean) => Promise<any[]>;
+        findEmbeddingModels: (includeInactive?: boolean) => Promise<any[]>;
+        findChatModels: (includeInactive?: boolean) => Promise<any[]>;
+        update: (id: number, data: any) => Promise<any>;
+        delete: (id: number) => Promise<any>;
+        toggleActive: (id: number) => Promise<any>;
+        getStatistics: () => Promise<any>;
+      };
     };
   }
 }

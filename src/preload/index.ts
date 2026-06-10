@@ -27,6 +27,40 @@ const api = {
       ipcRenderer.invoke('vector:deleteEmbedding', documentId),
     getEmbeddingCount: () => ipcRenderer.invoke('vector:getEmbeddingCount'),
   },
+
+  // Provider operations
+  provider: {
+    create: (data: any) => ipcRenderer.invoke('provider:create', data),
+    findById: (id: number) => ipcRenderer.invoke('provider:findById', id),
+    findByName: (name: string) => ipcRenderer.invoke('provider:findByName', name),
+    findAll: (includeInactive?: boolean) => 
+      ipcRenderer.invoke('provider:findAll', includeInactive),
+    update: (id: number, data: any) => ipcRenderer.invoke('provider:update', id, data),
+    delete: (id: number) => ipcRenderer.invoke('provider:delete', id),
+    toggleActive: (id: number) => ipcRenderer.invoke('provider:toggleActive', id),
+    getStatistics: () => ipcRenderer.invoke('provider:getStatistics'),
+  },
+
+  // Model operations
+  model: {
+    create: (data: any) => ipcRenderer.invoke('model:create', data),
+    findById: (id: number) => ipcRenderer.invoke('model:findById', id),
+    findByProviderAndName: (providerId: number, name: string) => 
+      ipcRenderer.invoke('model:findByProviderAndName', providerId, name),
+    findAll: (options?: any) => ipcRenderer.invoke('model:findAll', options),
+    findByProviderId: (providerId: number, includeInactive?: boolean) => 
+      ipcRenderer.invoke('model:findByProviderId', providerId, includeInactive),
+    findByType: (modelType: string, includeInactive?: boolean) => 
+      ipcRenderer.invoke('model:findByType', modelType, includeInactive),
+    findEmbeddingModels: (includeInactive?: boolean) => 
+      ipcRenderer.invoke('model:findEmbeddingModels', includeInactive),
+    findChatModels: (includeInactive?: boolean) => 
+      ipcRenderer.invoke('model:findChatModels', includeInactive),
+    update: (id: number, data: any) => ipcRenderer.invoke('model:update', id, data),
+    delete: (id: number) => ipcRenderer.invoke('model:delete', id),
+    toggleActive: (id: number) => ipcRenderer.invoke('model:toggleActive', id),
+    getStatistics: () => ipcRenderer.invoke('model:getStatistics'),
+  },
 };
 
 // Use `contextBridge` APIs to expose Electron APIs to

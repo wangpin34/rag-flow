@@ -4,7 +4,9 @@ import { join } from 'path';
 // import icon from '../../resources/icon.png?asset';
 import { vectorDatabaseService } from './lib/vector-database.service';
 import { documentService } from './repository/document.service';
+import { modelService } from './repository/model.service';
 import { prismaService } from './repository/prisma.service';
+import { providerService } from './repository/provider.service';
 
 function createWindow(): void {
   // Create the browser window.
@@ -106,6 +108,88 @@ app.whenReady().then(async () => {
 
   ipcMain.handle('vector:getEmbeddingCount', async () => {
     return vectorDatabaseService.getEmbeddingCount();
+  });
+
+  // Provider IPC handlers
+  ipcMain.handle('provider:create', async (_event, data) => {
+    return providerService.create(data);
+  });
+
+  ipcMain.handle('provider:findById', async (_event, id: number) => {
+    return providerService.findById(id);
+  });
+
+  ipcMain.handle('provider:findByName', async (_event, name: string) => {
+    return providerService.findByName(name);
+  });
+
+  ipcMain.handle('provider:findAll', async (_event, includeInactive?: boolean) => {
+    return providerService.findAll(includeInactive);
+  });
+
+  ipcMain.handle('provider:update', async (_event, id: number, data) => {
+    return providerService.update(id, data);
+  });
+
+  ipcMain.handle('provider:delete', async (_event, id: number) => {
+    return providerService.delete(id);
+  });
+
+  ipcMain.handle('provider:toggleActive', async (_event, id: number) => {
+    return providerService.toggleActive(id);
+  });
+
+  ipcMain.handle('provider:getStatistics', async () => {
+    return providerService.getStatistics();
+  });
+
+  // Model IPC handlers
+  ipcMain.handle('model:create', async (_event, data) => {
+    return modelService.create(data);
+  });
+
+  ipcMain.handle('model:findById', async (_event, id: number) => {
+    return modelService.findById(id);
+  });
+
+  ipcMain.handle('model:findByProviderAndName', async (_event, providerId: number, name: string) => {
+    return modelService.findByProviderAndName(providerId, name);
+  });
+
+  ipcMain.handle('model:findAll', async (_event, options?) => {
+    return modelService.findAll(options);
+  });
+
+  ipcMain.handle('model:findByProviderId', async (_event, providerId: number, includeInactive?: boolean) => {
+    return modelService.findByProviderId(providerId, includeInactive);
+  });
+
+  ipcMain.handle('model:findByType', async (_event, modelType: string, includeInactive?: boolean) => {
+    return modelService.findByType(modelType, includeInactive);
+  });
+
+  ipcMain.handle('model:findEmbeddingModels', async (_event, includeInactive?: boolean) => {
+    return modelService.findEmbeddingModels(includeInactive);
+  });
+
+  ipcMain.handle('model:findChatModels', async (_event, includeInactive?: boolean) => {
+    return modelService.findChatModels(includeInactive);
+  });
+
+  ipcMain.handle('model:update', async (_event, id: number, data) => {
+    return modelService.update(id, data);
+  });
+
+  ipcMain.handle('model:delete', async (_event, id: number) => {
+    return modelService.delete(id);
+  });
+
+  ipcMain.handle('model:toggleActive', async (_event, id: number) => {
+    return modelService.toggleActive(id);
+  });
+
+  ipcMain.handle('model:getStatistics', async () => {
+    return modelService.getStatistics();
   });
 
   createWindow();
