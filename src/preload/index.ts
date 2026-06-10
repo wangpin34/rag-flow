@@ -63,17 +63,24 @@ const api = {
   },
 };
 
+console.log('[Preload] API object created:', Object.keys(api));
+console.log('[Preload] Provider API methods:', Object.keys(api.provider));
+console.log('[Preload] Model API methods:', Object.keys(api.model));
+
 // Use `contextBridge` APIs to expose Electron APIs to
 // renderer only if context isolation is enabled, otherwise
 // just add to the DOM global.
 if (process.contextIsolated) {
   try {
+    console.log('[Preload] Context is isolated, using contextBridge');
     contextBridge.exposeInMainWorld('electron', electronAPI);
     contextBridge.exposeInMainWorld('api', api);
+    console.log('[Preload] Successfully exposed api to main world');
   } catch (error) {
-    console.error(error);
+    console.error('[Preload] Error exposing APIs:', error);
   }
 } else {
+  console.log('[Preload] Context is not isolated, adding to window');
   // @ts-ignore (define in dts)
   window.electron = electronAPI;
   // @ts-ignore (define in dts)

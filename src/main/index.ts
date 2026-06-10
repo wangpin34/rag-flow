@@ -7,6 +7,7 @@ import { documentService } from './repository/document.service';
 import { modelService } from './repository/model.service';
 import { prismaService } from './repository/prisma.service';
 import { providerService } from './repository/provider.service';
+import { seedDatabase } from './repository/seed';
 
 function createWindow(): void {
   // Create the browser window.
@@ -18,7 +19,9 @@ function createWindow(): void {
     // ...(process.platform === 'linux' ? { icon } : {}),
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
-      sandbox: false
+      sandbox: false,
+      contextIsolation: true,
+      nodeIntegration: false
     }
   });
 
@@ -56,6 +59,9 @@ app.whenReady().then(async () => {
   // Initialize databases
   await prismaService.connect();
   await vectorDatabaseService.connect();
+
+  // Seed database with default providers and models
+  await seedDatabase();
 
   // IPC handlers
   ipcMain.on('ping', () => console.log('pong'));
@@ -112,52 +118,118 @@ app.whenReady().then(async () => {
 
   // Provider IPC handlers
   ipcMain.handle('provider:create', async (_event, data) => {
-    return providerService.create(data);
+    try {
+      return await providerService.create(data);
+    } catch (error) {
+      console.error('provider:create error:', error);
+      throw error;
+    }
   });
 
   ipcMain.handle('provider:findById', async (_event, id: number) => {
-    return providerService.findById(id);
+    try {
+      return await providerService.findById(id);
+    } catch (error) {
+      console.error('provider:findById error:', error);
+      throw error;
+    }
   });
 
   ipcMain.handle('provider:findByName', async (_event, name: string) => {
-    return providerService.findByName(name);
+    try {
+      return await providerService.findByName(name);
+    } catch (error) {
+      console.error('provider:findByName error:', error);
+      throw error;
+    }
   });
 
   ipcMain.handle('provider:findAll', async (_event, includeInactive?: boolean) => {
-    return providerService.findAll(includeInactive);
+    try {
+      console.log('provider:findAll called with includeInactive:', includeInactive);
+      const result = await providerService.findAll(includeInactive);
+      console.log('provider:findAll result:', result);
+      return result;
+    } catch (error) {
+      console.error('provider:findAll error:', error);
+      throw error;
+    }
   });
 
   ipcMain.handle('provider:update', async (_event, id: number, data) => {
-    return providerService.update(id, data);
+    try {
+      return await providerService.update(id, data);
+    } catch (error) {
+      console.error('provider:update error:', error);
+      throw error;
+    }
   });
 
   ipcMain.handle('provider:delete', async (_event, id: number) => {
-    return providerService.delete(id);
+    try {
+      return await providerService.delete(id);
+    } catch (error) {
+      console.error('provider:delete error:', error);
+      throw error;
+    }
   });
 
   ipcMain.handle('provider:toggleActive', async (_event, id: number) => {
-    return providerService.toggleActive(id);
+    try {
+      return await providerService.toggleActive(id);
+    } catch (error) {
+      console.error('provider:toggleActive error:', error);
+      throw error;
+    }
   });
 
   ipcMain.handle('provider:getStatistics', async () => {
-    return providerService.getStatistics();
+    try {
+      return await providerService.getStatistics();
+    } catch (error) {
+      console.error('provider:getStatistics error:', error);
+      throw error;
+    }
   });
 
   // Model IPC handlers
   ipcMain.handle('model:create', async (_event, data) => {
-    return modelService.create(data);
+    try {
+      return await modelService.create(data);
+    } catch (error) {
+      console.error('model:create error:', error);
+      throw error;
+    }
   });
 
   ipcMain.handle('model:findById', async (_event, id: number) => {
-    return modelService.findById(id);
+    try {
+      return await modelService.findById(id);
+    } catch (error) {
+      console.error('model:findById error:', error);
+      throw error;
+    }
   });
 
   ipcMain.handle('model:findByProviderAndName', async (_event, providerId: number, name: string) => {
-    return modelService.findByProviderAndName(providerId, name);
+    try {
+      return await modelService.findByProviderAndName(providerId, name);
+    } catch (error) {
+      console.error('model:findByProviderAndName error:', error);
+      throw error;
+    }
   });
 
   ipcMain.handle('model:findAll', async (_event, options?) => {
-    return modelService.findAll(options);
+    try {
+      console.log('model:findAll called with options:', options);
+      const result = await modelService.findAll(options);
+      console.log('model:findAll result:', result);
+      return result;
+    } catch (error) {
+      console.error('model:findAll error:', error);
+      throw error;
+    }
   });
 
   ipcMain.handle('model:findByProviderId', async (_event, providerId: number, includeInactive?: boolean) => {
