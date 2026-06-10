@@ -184,30 +184,11 @@ const filteredModels = computed(() => {
 // Load providers and models
 const loadData = async () => {
   try {
-    console.log('Loading providers and models...');
-    console.log('window object keys:', Object.keys(window));
-    console.log('window.api exists:', !!window.api);
-    
-    if (window.api) {
-      console.log('window.api keys:', Object.keys(window.api));
-      console.log('window.api.provider exists:', !!window.api.provider);
-      console.log('window.api.model exists:', !!window.api.model);
-      
-      if (window.api.provider) {
-        console.log('window.api.provider keys:', Object.keys(window.api.provider));
-      }
-      if (window.api.model) {
-        console.log('window.api.model keys:', Object.keys(window.api.model));
-      }
-    }
-    
     providers.value = await window.api.provider.findAll(true); // Include inactive
-    console.log('Providers loaded:', providers.value);
     models.value = await window.api.model.findAll({ includeInactive: true }); // Include inactive
-    console.log('Models loaded:', models.value);
   } catch (error) {
     console.error('Error loading data:', error);
-    message.error(`Failed to load data: ${error}`);
+    message.error('Failed to load data');
   }
 };
 

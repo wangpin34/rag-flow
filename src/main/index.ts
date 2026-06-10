@@ -18,7 +18,7 @@ function createWindow(): void {
     autoHideMenuBar: true,
     // ...(process.platform === 'linux' ? { icon } : {}),
     webPreferences: {
-      preload: join(__dirname, '../preload/index.js'),
+      preload: join(__dirname, '../preload/index.mjs'),
       sandbox: false,
       contextIsolation: true,
       nodeIntegration: false
@@ -118,118 +118,52 @@ app.whenReady().then(async () => {
 
   // Provider IPC handlers
   ipcMain.handle('provider:create', async (_event, data) => {
-    try {
-      return await providerService.create(data);
-    } catch (error) {
-      console.error('provider:create error:', error);
-      throw error;
-    }
+    return providerService.create(data);
   });
 
   ipcMain.handle('provider:findById', async (_event, id: number) => {
-    try {
-      return await providerService.findById(id);
-    } catch (error) {
-      console.error('provider:findById error:', error);
-      throw error;
-    }
+    return providerService.findById(id);
   });
 
   ipcMain.handle('provider:findByName', async (_event, name: string) => {
-    try {
-      return await providerService.findByName(name);
-    } catch (error) {
-      console.error('provider:findByName error:', error);
-      throw error;
-    }
+    return providerService.findByName(name);
   });
 
   ipcMain.handle('provider:findAll', async (_event, includeInactive?: boolean) => {
-    try {
-      console.log('provider:findAll called with includeInactive:', includeInactive);
-      const result = await providerService.findAll(includeInactive);
-      console.log('provider:findAll result:', result);
-      return result;
-    } catch (error) {
-      console.error('provider:findAll error:', error);
-      throw error;
-    }
+    return providerService.findAll(includeInactive);
   });
 
   ipcMain.handle('provider:update', async (_event, id: number, data) => {
-    try {
-      return await providerService.update(id, data);
-    } catch (error) {
-      console.error('provider:update error:', error);
-      throw error;
-    }
+    return providerService.update(id, data);
   });
 
   ipcMain.handle('provider:delete', async (_event, id: number) => {
-    try {
-      return await providerService.delete(id);
-    } catch (error) {
-      console.error('provider:delete error:', error);
-      throw error;
-    }
+    return providerService.delete(id);
   });
 
   ipcMain.handle('provider:toggleActive', async (_event, id: number) => {
-    try {
-      return await providerService.toggleActive(id);
-    } catch (error) {
-      console.error('provider:toggleActive error:', error);
-      throw error;
-    }
+    return providerService.toggleActive(id);
   });
 
   ipcMain.handle('provider:getStatistics', async () => {
-    try {
-      return await providerService.getStatistics();
-    } catch (error) {
-      console.error('provider:getStatistics error:', error);
-      throw error;
-    }
+    return providerService.getStatistics();
   });
 
   // Model IPC handlers
   ipcMain.handle('model:create', async (_event, data) => {
-    try {
-      return await modelService.create(data);
-    } catch (error) {
-      console.error('model:create error:', error);
-      throw error;
-    }
+    return modelService.create(data);
   });
 
   ipcMain.handle('model:findById', async (_event, id: number) => {
-    try {
-      return await modelService.findById(id);
-    } catch (error) {
-      console.error('model:findById error:', error);
-      throw error;
-    }
+    return modelService.findById(id);
   });
 
   ipcMain.handle('model:findByProviderAndName', async (_event, providerId: number, name: string) => {
-    try {
-      return await modelService.findByProviderAndName(providerId, name);
-    } catch (error) {
-      console.error('model:findByProviderAndName error:', error);
-      throw error;
-    }
+    return modelService.findByProviderAndName(providerId, name);
   });
 
   ipcMain.handle('model:findAll', async (_event, options?) => {
-    try {
-      console.log('model:findAll called with options:', options);
-      const result = await modelService.findAll(options);
-      console.log('model:findAll result:', result);
-      return result;
-    } catch (error) {
-      console.error('model:findAll error:', error);
-      throw error;
-    }
+    return modelService.findAll(options);
   });
 
   ipcMain.handle('model:findByProviderId', async (_event, providerId: number, includeInactive?: boolean) => {
