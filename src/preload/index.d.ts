@@ -45,6 +45,25 @@ declare global {
         toggleActive: (id: number) => Promise<any>;
         getStatistics: () => Promise<any>;
       };
+      chat: {
+        create: (data: any) => Promise<any>;
+        findById: (id: number) => Promise<any>;
+        findAll: (page?: number, pageSize?: number) => Promise<any>;
+        update: (id: number, data: any) => Promise<any>;
+        delete: (id: number) => Promise<any>;
+        addMessage: (data: any) => Promise<any>;
+        getMessages: (chatId: number) => Promise<any[]>;
+        deleteMessage: (id: number) => Promise<any>;
+        getStatistics: () => Promise<any>;
+      };
+      settings: {
+        get: (key: string) => Promise<any>;
+        set: (key: string, value: any) => Promise<any>;
+        delete: (key: string) => Promise<any>;
+        getAll: () => Promise<Record<string, any>>;
+        getLastUsedModelId: () => Promise<number | null>;
+        setLastUsedModelId: (modelId: number) => Promise<any>;
+      };
     };
   }
 }

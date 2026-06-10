@@ -86,9 +86,49 @@ model Model {
   config          String?  // JSON string for model-specific configuration
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
+  chats           Chat[]
   
   @@map("models")
   @@unique([providerId, name])
   @@index([providerId])
   @@index([modelType])
+}
+
+// Chat/Conversation model
+model Chat {
+  id          Int       @id @default(autoincrement())
+  title       String    // Auto-generated or user-defined
+  modelId     Int
+  model       Model     @relation(fields: [modelId], references: [id])
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  messages    Message[]
+  
+  @@map("chats")
+  @@index([modelId])
+  @@index([createdAt])
+}
+
+// Message model for chat messages
+model Message {
+  id        Int      @id @default(autoincrement())
+  chatId    Int
+  chat      Chat     @relation(fields: [chatId], references: [id], onDelete: Cascade)
+  role      String   // "user", "assistant", "system"
+  content   String
+  metadata  String?  // JSON string for tokens, timing, etc.
+  createdAt DateTime @default(now())
+  
+  @@map("messages")
+  @@index([chatId])
+}
+
+// Settings model for storing app preferences
+model Settings {
+  id             Int      @id @default(autoincrement())
+  key            String   @unique  // e.g., "lastUsedModelId"
+  value          String   // JSON string for flexible value storage
+  updatedAt      DateTime @updatedAt
+  
+  @@map("settings")
 }

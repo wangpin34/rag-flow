@@ -29,7 +29,7 @@
 
 <script setup lang="ts">
 import { NEmpty, NIcon, NList, NListItem, NScrollbar, NThing } from 'naive-ui';
-import { ref } from 'vue';
+import { onMounted, ref } from 'vue';
 
 interface Chat {
   id: number;
@@ -43,27 +43,45 @@ const emit = defineEmits<{
 }>();
 
 const selectedChatId = ref<number | null>(null);
+const chats = ref<Chat[]>([]);
+const loading = ref(false);
 
-// Mock data - replace with actual API calls
-const chats = ref<Chat[]>([
-  {
-    id: 1,
-    title: 'New Chat',
-    preview: 'How can I help you today?',
-    updatedAt: new Date(),
-  },
-  {
-    id: 2,
-    title: 'Previous Conversation',
-    preview: 'Let me explain that...',
-    updatedAt: new Date(Date.now() - 86400000),
-  },
-]);
+// Load chats from API
+const loadChats = async () => {
+  try {
+    loading.value = true;
+    const response = await window.api.chat.findAll(1, 50);
+    
+    // Map chats to the format we need
+    chats.value = response.chats.map((chat: any) => {
+      let preview = 'No messages yet';
+      if (chat.messages && chat.messages.length > 0) {
+        const firstMessage = chat.messages[0];
+        preview = firstMessage.content.slice(0, 60) + (firstMessage.content.length > 60 ? '...' : '');
+      }
+      
+      return {
+        id: chat.id,
+        title: chat.title,
+        preview,
+        updatedAt: new Date(chat.updatedAt),
+      };
+    });
+  } catch (error) {
+    console.error('Error loading chats:', error);
+  } finally {
+    loading.value = false;
+  }
+};
 
 const selectChat = (id: number) => {
   selectedChatId.value = id;
   emit('selectChat', id);
 };
+
+onMounted(() => {
+  loadChats();
+});
 </script>
 
 <style scoped>

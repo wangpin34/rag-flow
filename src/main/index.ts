@@ -4,11 +4,13 @@ import { join } from 'path';
 // import icon from '../../resources/icon.png?asset';
 import { providerApiService } from './lib/provider-api.service';
 import { vectorDatabaseService } from './lib/vector-database.service';
+import { chatService } from './repository/chat.service';
 import { documentService } from './repository/document.service';
 import { modelService } from './repository/model.service';
 import { prismaService } from './repository/prisma.service';
 import { providerService } from './repository/provider.service';
 import { seedDatabase } from './repository/seed';
+import { settingsService } from './repository/settings.service';
 
 function createWindow(): void {
   // Create the browser window.
@@ -245,6 +247,68 @@ app.whenReady().then(async () => {
 
   ipcMain.handle('model:getStatistics', async () => {
     return modelService.getStatistics();
+  });
+
+  // Chat IPC handlers
+  ipcMain.handle('chat:create', async (_event, data) => {
+    return chatService.create(data);
+  });
+
+  ipcMain.handle('chat:findById', async (_event, id: number) => {
+    return chatService.findById(id);
+  });
+
+  ipcMain.handle('chat:findAll', async (_event, page?: number, pageSize?: number) => {
+    return chatService.findAll(page, pageSize);
+  });
+
+  ipcMain.handle('chat:update', async (_event, id: number, data) => {
+    return chatService.update(id, data);
+  });
+
+  ipcMain.handle('chat:delete', async (_event, id: number) => {
+    return chatService.delete(id);
+  });
+
+  ipcMain.handle('chat:addMessage', async (_event, data) => {
+    return chatService.addMessage(data);
+  });
+
+  ipcMain.handle('chat:getMessages', async (_event, chatId: number) => {
+    return chatService.getMessages(chatId);
+  });
+
+  ipcMain.handle('chat:deleteMessage', async (_event, id: number) => {
+    return chatService.deleteMessage(id);
+  });
+
+  ipcMain.handle('chat:getStatistics', async () => {
+    return chatService.getStatistics();
+  });
+
+  // Settings IPC handlers
+  ipcMain.handle('settings:get', async (_event, key: string) => {
+    return settingsService.get(key);
+  });
+
+  ipcMain.handle('settings:set', async (_event, key: string, value: any) => {
+    return settingsService.set(key, value);
+  });
+
+  ipcMain.handle('settings:delete', async (_event, key: string) => {
+    return settingsService.delete(key);
+  });
+
+  ipcMain.handle('settings:getAll', async () => {
+    return settingsService.getAll();
+  });
+
+  ipcMain.handle('settings:getLastUsedModelId', async () => {
+    return settingsService.getLastUsedModelId();
+  });
+
+  ipcMain.handle('settings:setLastUsedModelId', async (_event, modelId: number) => {
+    return settingsService.setLastUsedModelId(modelId);
   });
 
   createWindow();

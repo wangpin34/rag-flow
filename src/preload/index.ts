@@ -63,6 +63,31 @@ const api = {
     toggleActive: (id: number) => ipcRenderer.invoke('model:toggleActive', id),
     getStatistics: () => ipcRenderer.invoke('model:getStatistics'),
   },
+
+  // Chat operations
+  chat: {
+    create: (data: any) => ipcRenderer.invoke('chat:create', data),
+    findById: (id: number) => ipcRenderer.invoke('chat:findById', id),
+    findAll: (page?: number, pageSize?: number) => 
+      ipcRenderer.invoke('chat:findAll', page, pageSize),
+    update: (id: number, data: any) => ipcRenderer.invoke('chat:update', id, data),
+    delete: (id: number) => ipcRenderer.invoke('chat:delete', id),
+    addMessage: (data: any) => ipcRenderer.invoke('chat:addMessage', data),
+    getMessages: (chatId: number) => ipcRenderer.invoke('chat:getMessages', chatId),
+    deleteMessage: (id: number) => ipcRenderer.invoke('chat:deleteMessage', id),
+    getStatistics: () => ipcRenderer.invoke('chat:getStatistics'),
+  },
+
+  // Settings operations
+  settings: {
+    get: (key: string) => ipcRenderer.invoke('settings:get', key),
+    set: (key: string, value: any) => ipcRenderer.invoke('settings:set', key, value),
+    delete: (key: string) => ipcRenderer.invoke('settings:delete', key),
+    getAll: () => ipcRenderer.invoke('settings:getAll'),
+    getLastUsedModelId: () => ipcRenderer.invoke('settings:getLastUsedModelId'),
+    setLastUsedModelId: (modelId: number) => 
+      ipcRenderer.invoke('settings:setLastUsedModelId', modelId),
+  },
 };
 
 // Use `contextBridge` APIs to expose Electron APIs to

@@ -13,13 +13,28 @@ import {
 } from 'naive-ui';
 import { ref } from 'vue';
 import ChatList from './components/ChatList.vue';
+import ChatView from './components/ChatView.vue';
 import SettingsModal from './components/SettingsModal.vue';
 
 const showSettings = ref(false);
 const selectedChatId = ref<number | null>(null);
+const chatListKey = ref(0);
 
 const handleSelectChat = (id: number) => {
   selectedChatId.value = id;
+};
+
+const handleChatCreated = (id: number) => {
+  selectedChatId.value = id;
+  chatListKey.value++; // Force refresh chat list
+};
+
+const handleChatUpdated = () => {
+  chatListKey.value++; // Force refresh chat list
+};
+
+const handleNewChat = () => {
+  selectedChatId.value = null;
 };
 
 const openSettings = () => {
@@ -53,7 +68,7 @@ const openHelp = () => {
         <!-- Top section: Chat history -->
         <div style="flex: 1; overflow: hidden; display: flex; flex-direction: column">
           <div style="padding: 16px; padding-bottom: 8px">
-            <n-button type="primary" block @click="selectedChatId = null">
+            <n-button type="primary" block @click="handleNewChat">
               <template #icon>
                 <n-icon>
                   <svg
@@ -72,7 +87,7 @@ const openHelp = () => {
             </n-button>
           </div>
           <div style="flex: 1; overflow: hidden">
-            <ChatList @select-chat="handleSelectChat" />
+            <ChatList :key="chatListKey" @select-chat="handleSelectChat" />
           </div>
         </div>
 
@@ -140,37 +155,12 @@ const openHelp = () => {
         </div>
       </n-layout-sider>
 
-      <n-layout-content
-        content-style="padding: 24px; display: flex; flex-direction: column; height: 100vh;"
-      >
-        <div
-          v-if="selectedChatId === null"
-          style="
-            flex: 1;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            flex-direction: column;
-          "
-        >
-          <h1 style="margin-bottom: 16px">Welcome to Simple RAG</h1>
-          <p style="color: var(--n-text-color-disabled)">Select a chat or start a new one</p>
-        </div>
-        <div
-          v-else
-          style="
-            flex: 1;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            flex-direction: column;
-          "
-        >
-          <h2>Chat {{ selectedChatId }}</h2>
-          <p style="color: var(--n-text-color-disabled)">
-            Chat interface will be implemented here
-          </p>
-        </div>
+      <n-layout-content :native-scrollbar="false" style="height: 100vh; overflow: hidden">
+        <ChatView
+          :chat-id="selectedChatId"
+          @chat-created="handleChatCreated"
+          @chat-updated="handleChatUpdated"
+        />
       </n-layout-content>
     </n-layout>
 
