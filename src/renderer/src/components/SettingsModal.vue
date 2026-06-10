@@ -92,6 +92,13 @@
       </n-space>
     </template>
   </n-modal>
+
+  <!-- Provider Details Drawer -->
+  <ProviderDetails
+    v-model:show="showProviderDetails"
+    :provider-id="selectedProviderId"
+    @refresh="loadData"
+  />
 </template>
 
 <script setup lang="ts">
@@ -113,6 +120,7 @@ import {
     type DataTableColumns,
 } from 'naive-ui';
 import { computed, h, onMounted, ref, watch } from 'vue';
+import ProviderDetails from './ProviderDetails.vue';
 
 const props = defineProps<{
   show: boolean;
@@ -132,6 +140,8 @@ const showAddProvider = ref(false);
 const selectedProvider = ref<number | null>(null);
 const providers = ref<any[]>([]);
 const models = ref<any[]>([]);
+const showProviderDetails = ref(false);
+const selectedProviderId = ref<number | null>(null);
 
 const newProvider = ref({
   name: '',
@@ -147,11 +157,26 @@ const providerColumns: DataTableColumns<any> = [
   {
     title: 'Active',
     key: 'isActive',
+    width: 80,
     render: (row) =>
       h(NSwitch, {
         value: row.isActive,
         onUpdateValue: () => toggleProviderActive(row.id),
       }),
+  },
+  {
+    title: 'Actions',
+    key: 'actions',
+    width: 120,
+    render: (row) =>
+      h(
+        NButton,
+        {
+          size: 'small',
+          onClick: () => openProviderDetails(row.id),
+        },
+        { default: () => 'Manage Models' }
+      ),
   },
 ];
 
@@ -180,6 +205,12 @@ const filteredModels = computed(() => {
   if (!selectedProvider.value) return models.value;
   return models.value.filter((m) => m.providerId === selectedProvider.value);
 });
+
+// Open provider details
+const openProviderDetails = (providerId: number) => {
+  selectedProviderId.value = providerId;
+  showProviderDetails.value = true;
+};
 
 // Load providers and models
 const loadData = async () => {

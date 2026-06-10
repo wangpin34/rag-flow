@@ -2,6 +2,7 @@ import { electronApp, is, optimizer } from '@electron-toolkit/utils';
 import { app, BrowserWindow, ipcMain, shell } from 'electron';
 import { join } from 'path';
 // import icon from '../../resources/icon.png?asset';
+import { providerApiService } from './lib/provider-api.service';
 import { vectorDatabaseService } from './lib/vector-database.service';
 import { documentService } from './repository/document.service';
 import { modelService } from './repository/model.service';
@@ -147,6 +148,54 @@ app.whenReady().then(async () => {
 
   ipcMain.handle('provider:getStatistics', async () => {
     return providerService.getStatistics();
+  });
+
+  ipcMain.handle('provider:listModels', async (_event, providerId: number, apiKey?: string) => {
+    try {
+      const provider = await providerService.findById(providerId);
+      if (!provider) {
+        throw new Error('Provider not found');
+      }
+
+      let models;
+      if (provider.name.toLowerCase() === 'ollama') {
+        models = await providerApiService.listOllamaModels(provider.apiEndpoint || 'http://localhost:11434/api');
+      } else if (provider.name.toLowerCase() === 'openai') {
+        if (!apiKey) {
+          throw new Error('API key required for OpenAI');
+        }
+        models = await providerApiService.listOpenAIModels(provider.apiEndpoint || 'https://api.openai.com/v1', apiKey);
+      } else {
+        throw new Error(`Unsupported provider: ${provider.name}`);
+      }
+
+      // Add models to database if they don't exist
+      const createdModels = [];
+      for (const modelData of models) {
+        const existing = await modelService.findByProviderAndName(providerId, modelData.name);
+        if (!existing) {
+          const created = await modelService.create({
+            provider: { connect: { id: providerId } },
+            name: modelData.name,
+            displayName: modelData.displayName,
+            modelType: modelData.modelType,
+            contextWindow: modelData.contextWindow,
+            embeddingDim: (modelData as any).embeddingDim || null,
+            isActive: false,
+          });
+          createdModels.push(created);
+        }
+      }
+
+      return {
+        total: models.length,
+        added: createdModels.length,
+        models: createdModels,
+      };
+    } catch (error) {
+      console.error('provider:listModels error:', error);
+      throw error;
+    }
   });
 
   // Model IPC handlers

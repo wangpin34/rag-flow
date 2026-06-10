@@ -29,6 +29,7 @@ declare global {
         delete: (id: number) => Promise<any>;
         toggleActive: (id: number) => Promise<any>;
         getStatistics: () => Promise<any>;
+        listModels: (providerId: number, apiKey?: string) => Promise<any>;
       };
       model: {
         create: (data: any) => Promise<any>;

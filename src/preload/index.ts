@@ -39,6 +39,8 @@ const api = {
     delete: (id: number) => ipcRenderer.invoke('provider:delete', id),
     toggleActive: (id: number) => ipcRenderer.invoke('provider:toggleActive', id),
     getStatistics: () => ipcRenderer.invoke('provider:getStatistics'),
+    listModels: (providerId: number, apiKey?: string) => 
+      ipcRenderer.invoke('provider:listModels', providerId, apiKey),
   },
 
   // Model operations
