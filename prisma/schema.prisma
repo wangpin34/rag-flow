@@ -1,0 +1,58 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+// Document model for storing text content
+model Document {
+  id          Int      @id @default(autoincrement())
+  content     String
+  metadata    String?  // JSON string for flexible metadata
+  source      String?  // Source file path or URL
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  chunks      Chunk[]
+  
+  @@map("documents")
+}
+
+// Chunk model for splitting documents into smaller pieces
+model Chunk {
+  id          Int      @id @default(autoincrement())
+  documentId  Int
+  document    Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  content     String
+  chunkIndex  Int      // Order of chunk in document
+  metadata    String?  // JSON string for chunk-specific metadata
+  createdAt   DateTime @default(now())
+  
+  @@map("chunks")
+  @@index([documentId])
+}
+
+// Collection model for organizing documents
+model Collection {
+  id          Int      @id @default(autoincrement())
+  name        String   @unique
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  @@map("collections")
+}
+
+// Query history for tracking searches
+model QueryHistory {
+  id        Int      @id @default(autoincrement())
+  query     String
+  results   String?  // JSON string for storing results
+  createdAt DateTime @default(now())
+  
+  @@map("query_history")
+}

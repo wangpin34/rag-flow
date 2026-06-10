@@ -5,7 +5,16 @@
     "module": "ESNext",
     "moduleResolution": "bundler",
     "allowSyntheticDefaultImports": true,
-    "strict": true
+    "strict": true,
+    "types": ["node"],
+    "paths": {
+      "@shared/*": ["./src/types/*"]
+    }
   },
-  "include": ["vite.config.ts"]
+  "include": [
+    "electron.vite.config.ts",
+    "src/main/**/*",
+    "src/preload/**/*",
+    "prisma.config.ts"
+  ]
 }
