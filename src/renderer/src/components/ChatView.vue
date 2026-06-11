@@ -27,17 +27,51 @@
         <div :class="['message', `message-${message.role}`]">
           <div class="message-header">
             <n-text strong>{{ message.role === 'user' ? 'You' : 'Assistant' }}</n-text>
-            <n-text depth="3" :style="{ fontSize: '12px' }">
-              {{ formatTime(message.createdAt) }}
-            </n-text>
+            <n-space align="center" :size="8">
+              <n-text depth="3" :style="{ fontSize: '12px' }">
+                {{ formatTime(message.createdAt) }}
+              </n-text>
+              <n-button
+                v-if="message.role === 'user' && !isLoading"
+                text
+                size="tiny"
+                @click="handleRetry(message)"
+                :style="{ padding: '2px 4px' }"
+              >
+                <template #icon>
+                  <n-icon size="14">
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="2"
+                    >
+                      <path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2" />
+                    </svg>
+                  </n-icon>
+                </template>
+                Retry
+              </n-button>
+            </n-space>
           </div>
-          <div class="message-content">
-            <n-text>{{ message.content }}</n-text>
+          <div class="message-content markdown-body" v-html="parseMarkdown(message.content)"></div>
+        </div>
+      </div>
+
+      <div v-if="isStreaming || (isLoading && streamingMessage)" class="message-wrapper">
+        <div class="message message-assistant">
+          <div class="message-header">
+            <n-text strong>Assistant</n-text>
+          </div>
+          <div class="message-content markdown-body">
+            <span v-html="parseMarkdown(streamingMessage)"></span>
+            <span class="streaming-cursor">▊</span>
           </div>
         </div>
       </div>
 
-      <div v-if="isLoading" class="message-wrapper">
+      <div v-else-if="isLoading" class="message-wrapper">
         <div class="message message-assistant">
           <div class="message-header">
             <n-text strong>Assistant</n-text>
@@ -73,12 +107,34 @@
         </n-space>
       </n-space>
     </div>
+
+    <!-- API Key Modal -->
+    <n-modal
+      v-model:show="showApiKeyModal"
+      preset="dialog"
+      title="API Key Required"
+      positive-text="Submit"
+      negative-text="Cancel"
+      @positive-click="handleApiKeySubmit"
+    >
+      <n-space vertical :size="12">
+        <n-text>This provider requires an API key. Please enter your API key:</n-text>
+        <n-input
+          v-model:value="apiKeyInput"
+          type="password"
+          placeholder="Enter API key"
+          @keydown.enter="handleApiKeySubmit"
+        />
+      </n-space>
+    </n-modal>
   </div>
 </template>
 
 <script setup lang="ts">
-import { NButton, NEmpty, NInput, NSelect, NSpace, NSpin, NText, useMessage } from 'naive-ui';
+import { NButton, NEmpty, NIcon, NInput, NModal, NSelect, NSpace, NSpin, NText, useMessage } from 'naive-ui';
 import { computed, nextTick, onMounted, ref, watch } from 'vue';
+import { aiApiService } from '../lib/ai-api.service';
+import { parseMarkdown } from '../lib/markdown';
 
 interface Props {
   chatId?: number | null;
@@ -98,6 +154,12 @@ const isLoading = ref(false);
 const selectedModelId = ref<number | null>(null);
 const models = ref<any[]>([]);
 const messagesContainer = ref<HTMLElement | null>(null);
+const showApiKeyModal = ref(false);
+const apiKeyInput = ref('');
+const pendingApiCall = ref<(() => Promise<void>) | null>(null);
+const streamingMessage = ref('');
+const isStreaming = ref(false);
+const pendingCustomHistory = ref<any[] | undefined>(undefined);
 
 // Model options for the dropdown
 const modelOptions = computed(() =>
@@ -233,9 +295,8 @@ const handleSendMessage = async () => {
       emit('chatUpdated');
     }
 
-    // TODO: Call AI model API to get response
-    // For now, simulate a response
-    await simulateAIResponse(content);
+    // Call AI API to get response
+    await getAIResponse(content);
 
   } catch (error) {
     console.error('Error sending message:', error);
@@ -245,21 +306,127 @@ const handleSendMessage = async () => {
   }
 };
 
-// Simulate AI response (placeholder)
-const simulateAIResponse = async (userMessage: string) => {
-  // Wait a bit to simulate API call
-  await new Promise((resolve) => setTimeout(resolve, 1000));
+// Get AI response from API with streaming
+const getAIResponse = async (userMessage: string, apiKey?: string, customHistory?: any[]) => {
+  streamingMessage.value = '';
+  isStreaming.value = true;
+  
+  try {
+    // Get the model details
+    const model = models.value.find((m) => m.id === selectedModelId.value);
+    if (!model) {
+      throw new Error('Model not found');
+    }
 
-  const responseContent = `This is a placeholder response to: "${userMessage}". AI integration coming soon!`;
+    // Build conversation history - use custom history if provided (for retry)
+    const messagesToUse = customHistory || messages.value;
+    const conversationMessages = messagesToUse
+      .filter((m) => m.role !== 'system')
+      .map((m) => ({
+        role: m.role as 'user' | 'assistant',
+        content: m.content,
+      }));
 
-  const assistantMessage = await window.api.chat.addMessage({
-    chatId: currentChat.value!.id,
-    role: 'assistant',
-    content: responseContent,
-  });
+    // Call the AI API with streaming
+    await aiApiService.chatStream(
+      model.provider.name,
+      model.provider.apiEndpoint || '',
+      model.name,
+      conversationMessages,
+      (chunk: string) => {
+        streamingMessage.value += chunk;
+        scrollToBottom();
+      },
+      apiKey
+    );
 
-  messages.value.push(assistantMessage);
-  await scrollToBottom();
+    // Save the complete assistant response to database
+    const assistantMessage = await window.api.chat.addMessage({
+      chatId: currentChat.value!.id,
+      role: 'assistant',
+      content: streamingMessage.value,
+    });
+
+    messages.value.push(assistantMessage);
+    streamingMessage.value = '';
+    isStreaming.value = false;
+    await scrollToBottom();
+  } catch (error: any) {
+    isStreaming.value = false;
+    streamingMessage.value = '';
+    console.error('Error getting AI response:', error);
+    
+    // Check if it's an API key error for OpenAI
+    if (error.message?.includes('API key') && !apiKey) {
+      // Prompt for API key
+      pendingCustomHistory.value = customHistory;
+      pendingApiCall.value = async () => {
+        await getAIResponse(userMessage, apiKeyInput.value, pendingCustomHistory.value);
+        pendingCustomHistory.value = undefined;
+      };
+      showApiKeyModal.value = true;
+    } else {
+      message.error(`Failed to get AI response: ${error.message || 'Unknown error'}`);
+      
+      // Add error message to chat
+      const errorMessage = await window.api.chat.addMessage({
+        chatId: currentChat.value!.id,
+        role: 'assistant',
+        content: `Error: ${error.message || 'Failed to get response from AI'}`,
+      });
+      messages.value.push(errorMessage);
+      await scrollToBottom();
+    }
+  }
+};
+
+// Handle retry of a user message
+const handleRetry = async (userMessage: any) => {
+  if (isLoading.value || isStreaming.value) return;
+
+  try {
+    isLoading.value = true;
+
+    // Find the index of the user message
+    const userMsgIndex = messages.value.findIndex((m) => m.id === userMessage.id);
+    if (userMsgIndex === -1) return;
+
+    // Build conversation history up to and including this user message for context
+    // This ensures the AI only sees messages up to the retry point
+    const historyUpToRetry = messages.value.slice(0, userMsgIndex + 1);
+
+    // Get new AI response with custom history
+    // The new response will be added at the end of messages.value (after all existing messages)
+    await getAIResponse(userMessage.content, undefined, historyUpToRetry);
+    
+    emit('chatUpdated');
+  } catch (error) {
+    console.error('Error retrying message:', error);
+    message.error('Failed to retry message');
+  } finally {
+    isLoading.value = false;
+  }
+};
+
+// Handle API key submission
+const handleApiKeySubmit = async () => {
+  if (!apiKeyInput.value.trim()) {
+    message.error('Please enter an API key');
+    return;
+  }
+
+  showApiKeyModal.value = false;
+  
+  if (pendingApiCall.value) {
+    isLoading.value = true;
+    try {
+      await pendingApiCall.value();
+    } finally {
+      isLoading.value = false;
+      pendingApiCall.value = null;
+      apiKeyInput.value = '';
+    }
+  }
 };
 
 // Scroll to bottom of messages
@@ -354,9 +521,285 @@ onMounted(async () => {
   word-wrap: break-word;
 }
 
+.streaming-cursor {
+  display: inline-block;
+  margin-left: 2px;
+  animation: blink 1s infinite;
+  color: #18a058;
+}
+
+@keyframes blink {
+  0%, 50% {
+    opacity: 1;
+  }
+  51%, 100% {
+    opacity: 0;
+  }
+}
+
 .input-container {
   padding: 16px 24px;
   border-top: 1px solid #2c2c32;
   background: #18181c;
+}
+
+/* Markdown Styles */
+.markdown-body {
+  color: #e5e5e5;
+  font-size: 14px;
+}
+
+.markdown-body h1,
+.markdown-body h2,
+.markdown-body h3,
+.markdown-body h4,
+.markdown-body h5,
+.markdown-body h6 {
+  margin-top: 24px;
+  margin-bottom: 16px;
+  font-weight: 600;
+  line-height: 1.25;
+  color: #ffffff;
+}
+
+.markdown-body h1 {
+  font-size: 2em;
+  border-bottom: 1px solid #3f3f46;
+  padding-bottom: 0.3em;
+}
+
+.markdown-body h2 {
+  font-size: 1.5em;
+  border-bottom: 1px solid #3f3f46;
+  padding-bottom: 0.3em;
+}
+
+.markdown-body h3 {
+  font-size: 1.25em;
+}
+
+.markdown-body h4 {
+  font-size: 1em;
+}
+
+.markdown-body h5 {
+  font-size: 0.875em;
+}
+
+.markdown-body h6 {
+  font-size: 0.85em;
+  color: #a1a1aa;
+}
+
+.markdown-body p {
+  margin-top: 0;
+  margin-bottom: 16px;
+}
+
+.markdown-body a {
+  color: #18a058;
+  text-decoration: none;
+}
+
+.markdown-body a:hover {
+  text-decoration: underline;
+}
+
+.markdown-body code {
+  padding: 0.2em 0.4em;
+  margin: 0;
+  font-size: 85%;
+  background-color: rgba(110, 118, 129, 0.4);
+  border-radius: 6px;
+  font-family: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace;
+}
+
+.markdown-body pre {
+  padding: 16px;
+  overflow: auto;
+  font-size: 85%;
+  line-height: 1.45;
+  background-color: #1a1a1f;
+  border-radius: 6px;
+  margin-top: 0;
+  margin-bottom: 16px;
+}
+
+.markdown-body pre code {
+  display: block;
+  padding: 0;
+  margin: 0;
+  overflow: visible;
+  line-height: inherit;
+  word-wrap: normal;
+  background-color: transparent;
+  border: 0;
+}
+
+.markdown-body ul,
+.markdown-body ol {
+  padding-left: 2em;
+  margin-top: 0;
+  margin-bottom: 16px;
+}
+
+.markdown-body li {
+  margin-top: 0.25em;
+}
+
+.markdown-body li + li {
+  margin-top: 0.25em;
+}
+
+.markdown-body blockquote {
+  margin: 0;
+  padding: 0 1em;
+  color: #a1a1aa;
+  border-left: 0.25em solid #3f3f46;
+  margin-bottom: 16px;
+}
+
+.markdown-body blockquote > :first-child {
+  margin-top: 0;
+}
+
+.markdown-body blockquote > :last-child {
+  margin-bottom: 0;
+}
+
+.markdown-body table {
+  border-spacing: 0;
+  border-collapse: collapse;
+  margin-top: 0;
+  margin-bottom: 16px;
+  width: 100%;
+  overflow: auto;
+}
+
+.markdown-body table th {
+  font-weight: 600;
+  padding: 6px 13px;
+  border: 1px solid #3f3f46;
+  background-color: #28282e;
+}
+
+.markdown-body table td {
+  padding: 6px 13px;
+  border: 1px solid #3f3f46;
+}
+
+.markdown-body table tr {
+  background-color: transparent;
+  border-top: 1px solid #3f3f46;
+}
+
+.markdown-body table tr:nth-child(2n) {
+  background-color: rgba(110, 118, 129, 0.1);
+}
+
+.markdown-body hr {
+  height: 0.25em;
+  padding: 0;
+  margin: 24px 0;
+  background-color: #3f3f46;
+  border: 0;
+}
+
+.markdown-body img {
+  max-width: 100%;
+  box-sizing: content-box;
+  background-color: transparent;
+}
+
+.markdown-body strong {
+  font-weight: 600;
+}
+
+.markdown-body em {
+  font-style: italic;
+}
+
+/* Syntax highlighting theme (dark) */
+.hljs {
+  color: #e5e5e5;
+  background: #1a1a1f;
+}
+
+.hljs-comment,
+.hljs-quote {
+  color: #6e7681;
+  font-style: italic;
+}
+
+.hljs-keyword,
+.hljs-selector-tag,
+.hljs-subst {
+  color: #ff7b72;
+}
+
+.hljs-number,
+.hljs-literal,
+.hljs-variable,
+.hljs-template-variable,
+.hljs-tag .hljs-attr {
+  color: #79c0ff;
+}
+
+.hljs-string,
+.hljs-doctag {
+  color: #a5d6ff;
+}
+
+.hljs-title,
+.hljs-section,
+.hljs-selector-id {
+  color: #d2a8ff;
+  font-weight: bold;
+}
+
+.hljs-type,
+.hljs-class .hljs-title {
+  color: #ffa657;
+}
+
+.hljs-tag,
+.hljs-name,
+.hljs-attribute {
+  color: #7ee787;
+}
+
+.hljs-regexp,
+.hljs-link {
+  color: #a5d6ff;
+}
+
+.hljs-symbol,
+.hljs-bullet {
+  color: #79c0ff;
+}
+
+.hljs-built_in,
+.hljs-builtin-name {
+  color: #ffa657;
+}
+
+.hljs-meta {
+  color: #8b949e;
+}
+
+.hljs-deletion {
+  background-color: #ffa198;
+}
+
+.hljs-addition {
+  background-color: #56d364;
+}
+
+.hljs-emphasis {
+  font-style: italic;
+}
+
+.hljs-strong {
+  font-weight: bold;
 }
 </style>
