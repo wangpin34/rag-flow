@@ -1,5 +1,5 @@
-import { marked } from 'marked';
 import hljs from 'highlight.js';
+import { marked } from 'marked';
 
 // Configure marked with custom renderer for code highlighting
 const renderer = new marked.Renderer();
