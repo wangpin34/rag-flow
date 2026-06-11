@@ -164,7 +164,7 @@ const pendingCustomHistory = ref<any[] | undefined>(undefined);
 // Model options for the dropdown
 const modelOptions = computed(() =>
   models.value
-    .filter((m) => m.modelType === 'chat')
+    .filter((m) => m.modelType === 'chat' && m.isActive && m.provider?.isActive)
     .map((m) => ({
       label: m.displayName || m.name,
       value: m.id,
@@ -174,7 +174,7 @@ const modelOptions = computed(() =>
 // Load models
 const loadModels = async () => {
   try {
-    models.value = await window.api.model.findAll({ includeInactive: true });
+    models.value = await window.api.model.findAll({ includeInactive: false });
   } catch (error) {
     console.error('Error loading models:', error);
     message.error('Failed to load models');
