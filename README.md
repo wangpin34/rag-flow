@@ -1,18 +1,60 @@
-# Vue 3 + TypeScript + Vite
+# RagFlow
 
-This template should help get you started developing with Vue 3 and TypeScript in Vite. The template uses Vue 3 `<script setup>` SFCs, check out the [script setup docs](https://v3.vuejs.org/api/sfc-script-setup.html#sfc-script-setup) to learn more.
+**RagFlow** is a powerful AI chat assistant built with Electron, Vue 3, and TypeScript. It combines custom AI model providers with Retrieval-Augmented Generation (RAG) capabilities to deliver context-aware, intelligent conversations.
+
+## Features
+
+- 🤖 **Custom Model Providers** - Configure multiple AI providers (Ollama, OpenAI, etc.)
+- 💬 **Intelligent Chat** - Markdown-formatted responses with syntax highlighting
+- 📚 **RAG Support** - Vector search with SQLite for context-aware responses
+- 🎨 **Modern UI** - Built with Naive UI and dark theme
+- 🔒 **Privacy First** - Local-first architecture with your data under your control
+- ⚡ **Fast & Lightweight** - Native desktop app with Electron
+
+## Tech Stack
+
+- **Frontend**: Vue 3, TypeScript, Naive UI
+- **Backend**: Electron, Node.js
+- **Database**: SQLite with Prisma ORM
+- **Vector Search**: sqlite-vec for embeddings
+- **Build**: electron-vite
+
+## Getting Started
+
+### Prerequisites
+
+- Node.js 18+
+- npm or yarn
+
+### Installation
+
+```bash
+# Install dependencies
+npm install
+
+# Run in development mode
+npm run dev
+
+# Build for production
+npm run build
+```
+
+## Development
+
+```bash
+# Type checking
+npm run typecheck
+
+# Preview build
+npm run preview
+```
 
 ## Recommended IDE Setup
 
-- [VS Code](https://code.visualstudio.com/) + [Volar](https://marketplace.visualstudio.com/items?itemName=Vue.volar) (and disable Vetur) + [TypeScript Vue Plugin (Volar)](https://marketplace.visualstudio.com/items?itemName=Vue.vscode-typescript-vue-plugin).
+- [VS Code](https://code.visualstudio.com/)
+- [Volar](https://marketplace.visualstudio.com/items?itemName=Vue.volar)
+- [TypeScript Vue Plugin (Volar)](https://marketplace.visualstudio.com/items?itemName=Vue.vscode-typescript-vue-plugin)
 
-## Type Support For `.vue` Imports in TS
+## License
 
-TypeScript cannot handle type information for `.vue` imports by default, so we replace the `tsc` CLI with `vue-tsc` for type checking. In editors, we need [TypeScript Vue Plugin (Volar)](https://marketplace.visualstudio.com/items?itemName=Vue.vscode-typescript-vue-plugin) to make the TypeScript language service aware of `.vue` types.
-
-If the standalone TypeScript plugin doesn't feel fast enough to you, Volar has also implemented a [Take Over Mode](https://github.com/johnsoncodehk/volar/discussions/471#discussioncomment-1361669) that is more performant. You can enable it by the following steps:
-
-1. Disable the built-in TypeScript Extension
-   1. Run `Extensions: Show Built-in Extensions` from VSCode's command palette
-   2. Find `TypeScript and JavaScript Language Features`, right click and select `Disable (Workspace)`
-2. Reload the VSCode window by running `Developer: Reload Window` from the command palette.
+MIT

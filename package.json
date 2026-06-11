@@ -1,10 +1,10 @@
 {
-  "name": "simple-rag",
+  "name": "ragflow",
   "private": true,
   "version": "0.0.0",
-  "description": "A simple RAG application with Electron, Vue, and SQLite",
+  "description": "RagFlow - AI chat assistant with custom model providers and RAG capabilities",
   "main": "./out/main/index.js",
-  "author": "simple-rag",
+  "author": "RagFlow",
   "type": "module",
   "scripts": {
     "dev": "electron-vite dev",

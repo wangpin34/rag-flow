@@ -1,5 +1,5 @@
-appId: com.simple-rag.app
-productName: simple-rag
+appId: com.ragflow.app
+productName: RagFlow
 directories:
   buildResources: resources
   output: dist
@@ -17,7 +17,7 @@ asarUnpack:
   - prisma/migrations/**
 afterSign: build/notarize.js
 win:
-  executableName: simple-rag
+  executableName: RagFlow
 nsis:
   artifactName: ${name}-${version}-setup.${ext}
   shortcutName: ${productName}
