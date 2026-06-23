@@ -1,15 +1,14 @@
 <script setup lang="ts">
 import {
-    NButton,
-    NConfigProvider,
-    NDivider,
-    NIcon,
-    NLayout,
-    NLayoutContent,
-    NLayoutSider,
-    NMessageProvider,
-    NSpace,
-    darkTheme,
+  NButton,
+  NConfigProvider,
+  NIcon,
+  NLayout,
+  NLayoutContent,
+  NLayoutSider,
+  NMessageProvider,
+  NSpace,
+  darkTheme,
 } from 'naive-ui';
 import { ref } from 'vue';
 import ChatList from './components/ChatList.vue';
@@ -63,11 +62,11 @@ const openHelp = () => {
         :width="280"
         show-trigger
         :native-scrollbar="false"
-        style="display: flex; flex-direction: column"
+        style="position: relative; overflow: hidden"
       >
-        <!-- Top section: Chat history -->
-        <div style="flex: 1; overflow: hidden; display: flex; flex-direction: column">
-          <div style="padding: 16px; padding-bottom: 8px">
+        <!-- Chat history: fills full height, scrollable, with bottom padding to clear the nav -->
+        <div style="display: flex; flex-direction: column; height: 100%">
+          <div style="padding: 16px; padding-bottom: 8px; flex-shrink: 0">
             <n-button type="primary" block @click="handleNewChat">
               <template #icon>
                 <n-icon>
@@ -86,15 +85,23 @@ const openHelp = () => {
               New Chat
             </n-button>
           </div>
-          <div style="flex: 1; overflow: hidden">
+          <div style="flex: 1; overflow-y: auto; padding-bottom: 120px">
             <ChatList :key="chatListKey" @select-chat="handleSelectChat" />
           </div>
         </div>
 
-        <n-divider style="margin: 0" />
-
-        <!-- Bottom section: Settings/About/Help -->
-        <div style="padding: 8px">
+        <!-- Bottom nav: absolutely positioned, overlaps the chat list -->
+        <div
+          style="
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            padding: 8px;
+            background: inherit;
+            border-top: 1px solid rgba(255, 255, 255, 0.09);
+          "
+        >
           <n-space vertical :size="4">
             <n-button text block @click="openSettings">
               <template #icon>
