@@ -48,6 +48,15 @@ class CollectionService {
     return prismaService.db.document.delete({ where: { id: documentId } });
   }
 
+  async getDocumentDetail(documentId: number) {
+    return prismaService.db.document.findUnique({
+      where: { id: documentId },
+      include: {
+        chunks: { orderBy: { chunkIndex: 'asc' } },
+      },
+    });
+  }
+
   async delete(id: number): Promise<Collection> {
     // Remove linked documents first
     await prismaService.db.document.deleteMany({

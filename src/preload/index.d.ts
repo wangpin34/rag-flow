@@ -71,6 +71,15 @@ declare global {
         getDocuments: (collectionId: number) => Promise<Array<{ id: number; source: string | null; createdAt: string }>>;
         addDocument: (collectionId: number, data: { content: string; fileName: string }) => Promise<any>;
         removeDocument: (documentId: number) => Promise<any>;
+        getDocumentDetail: (documentId: number) => Promise<{
+          id: number;
+          content: string;
+          source: string | null;
+          metadata: string | null;
+          createdAt: string;
+          updatedAt: string;
+          chunks: Array<{ id: number; chunkIndex: number; content: string; metadata: string | null; createdAt: string }>;
+        } | null>;
         delete: (id: number) => Promise<any>;
       };
     };

@@ -102,7 +102,8 @@
       v-model:show="showDocs"
       preset="card"
       :title="`${selectedCollection?.name ?? ''} — Files`"
-      :style="{ width: '640px', maxHeight: '80vh' }"
+      :style="{ width: '760px', maxHeight: '80vh' }"
+      :content-style="{ overflowY: 'auto' }"
     >
       <n-data-table
         :columns="docColumns"
@@ -112,6 +113,50 @@
         :row-key="(row: any) => row.id"
       />
     </n-modal>
+
+    <!-- Document Detail Modal -->
+    <n-modal
+      v-model:show="showDetail"
+      preset="card"
+      :title="selectedDoc?.source ?? 'Document Detail'"
+      :style="{ width: '900px', height: '80vh' }"
+      :content-style="{ height: 'calc(80vh - 110px)', overflowY: 'auto' }"
+    >
+      <div v-if="detailLoading" style="display:flex;justify-content:center;padding:40px">
+        <n-spin size="large" />
+      </div>
+      <template v-else-if="docDetail">
+        <n-space style="margin-bottom:16px" :size="24">
+          <n-text depth="3" style="font-size:13px">Source: {{ docDetail.source ?? '—' }}</n-text>
+          <n-text depth="3" style="font-size:13px">Added: {{ new Date(docDetail.createdAt).toLocaleString() }}</n-text>
+          <n-text depth="3" style="font-size:13px">Chunks: {{ docDetail.chunks.length }}</n-text>
+        </n-space>
+        <n-tabs type="line" animated>
+          <n-tab-pane name="content" tab="Source Content">
+            <n-scrollbar style="max-height: calc(80vh - 220px)">
+              <pre style="white-space: pre-wrap; word-break: break-all; font-size: 13px; font-family: monospace; margin: 0; padding: 16px; background: rgba(255,255,255,0.04); border-radius: 6px; line-height: 1.6">{{ docDetail.content }}</pre>
+            </n-scrollbar>
+          </n-tab-pane>
+          <n-tab-pane name="chunks" tab="Chunks">
+            <n-scrollbar style="max-height: calc(80vh - 220px)">
+              <div
+                v-for="chunk in docDetail.chunks"
+                :key="chunk.id"
+                style="margin-bottom: 12px; border: 1px solid rgba(255,255,255,0.1); border-radius: 6px; overflow: hidden"
+              >
+                <div style="display:flex;align-items:center;gap:12px;padding:8px 12px;background:rgba(255,255,255,0.05);border-bottom:1px solid rgba(255,255,255,0.08)">
+                  <n-tag size="small" round>Chunk {{ chunk.chunkIndex + 1 }}</n-tag>
+                  <n-text depth="3" style="font-size:12px">{{ chunk.content.length }} chars</n-text>
+                </div>
+                <pre style="white-space: pre-wrap; word-break: break-all; font-size: 13px; font-family: monospace; margin: 0; padding: 12px; line-height: 1.6">{{ chunk.content }}</pre>
+              </div>
+              <n-empty v-if="!docDetail.chunks.length" description="No chunks" style="padding: 40px" />
+            </n-scrollbar>
+          </n-tab-pane>
+        </n-tabs>
+      </template>
+      <n-empty v-else description="Failed to load document" style="padding: 40px" />
+    </n-modal>
   </n-space>
 </template>
 
@@ -119,12 +164,18 @@
 import {
     NButton,
     NDataTable,
+    NEmpty,
     NForm,
     NFormItem,
     NIcon,
     NInput,
     NModal,
+    NScrollbar,
     NSpace,
+    NSpin,
+    NTabPane,
+    NTabs,
+    NTag,
     NText,
     useMessage,
     type DataTableColumns,
@@ -141,6 +192,10 @@ const showDocs = ref(false);
 const documents = ref<any[]>([]);
 const docsLoading = ref(false);
 const selectedCollection = ref<any>(null);
+const showDetail = ref(false);
+const selectedDoc = ref<any>(null);
+const docDetail = ref<any>(null);
+const detailLoading = ref(false);
 const fileInputRef = ref<HTMLInputElement | null>(null);
 
 const form = ref<{ name: string; description: string; files: File[] }>({
@@ -223,6 +278,20 @@ const openDocs = async (row: any) => {
   }
 };
 
+const openDocDetail = async (row: any) => {
+  selectedDoc.value = row;
+  docDetail.value = null;
+  showDetail.value = true;
+  detailLoading.value = true;
+  try {
+    docDetail.value = await window.api.collection.getDocumentDetail(row.id);
+  } catch {
+    message.error('Failed to load document detail');
+  } finally {
+    detailLoading.value = false;
+  }
+};
+
 const handleDelete = async (row: any) => {
   try {
     await window.api.collection.delete(row.id);
@@ -275,24 +344,29 @@ const docColumns: DataTableColumns<any> = [
     render: (row) => new Date(row.createdAt).toLocaleDateString(),
   },
   {
-    title: '',
+    title: 'Actions',
     key: 'actions',
-    width: 80,
+    width: 160,
     render: (row) =>
-      h(NButton, {
-        size: 'small',
-        type: 'error',
-        text: true,
-        onClick: async () => {
-          try {
-            await window.api.collection.removeDocument(row.id);
-            documents.value = documents.value.filter((d) => d.id !== row.id);
-            await loadCollections();
-          } catch {
-            message.error('Failed to remove file');
-          }
-        },
-      }, { default: () => 'Remove' }),
+      h(NSpace, { size: 8 }, {
+        default: () => [
+          h(NButton, { size: 'small', onClick: () => openDocDetail(row) }, { default: () => 'Details' }),
+          h(NButton, {
+            size: 'small',
+            type: 'error',
+            text: true,
+            onClick: async () => {
+              try {
+                await window.api.collection.removeDocument(row.id);
+                documents.value = documents.value.filter((d) => d.id !== row.id);
+                await loadCollections();
+              } catch {
+                message.error('Failed to remove file');
+              }
+            },
+          }, { default: () => 'Remove' }),
+        ],
+      }),
   },
 ];
 

@@ -101,6 +101,8 @@ const api = {
       ipcRenderer.invoke('collection:addDocument', collectionId, data),
     removeDocument: (documentId: number) =>
       ipcRenderer.invoke('collection:removeDocument', documentId),
+    getDocumentDetail: (documentId: number) =>
+      ipcRenderer.invoke('collection:getDocumentDetail', documentId),
     delete: (id: number) => ipcRenderer.invoke('collection:delete', id),
   },
 };

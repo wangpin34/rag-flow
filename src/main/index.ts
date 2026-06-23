@@ -337,6 +337,10 @@ app.whenReady().then(async () => {
     return collectionService.removeDocument(documentId);
   });
 
+  ipcMain.handle('collection:getDocumentDetail', async (_event, documentId: number) => {
+    return collectionService.getDocumentDetail(documentId);
+  });
+
   ipcMain.handle('collection:delete', async (_event, id: number) => {
     return collectionService.delete(id);
   });
