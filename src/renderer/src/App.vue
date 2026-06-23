@@ -49,6 +49,25 @@ const openHelp = () => {
   // TODO: Implement help dialog
   console.log('Help clicked');
 };
+
+const siderWidth = ref(280);
+let _dragStartX = 0;
+let _dragStartWidth = 280;
+
+const onResizeStart = (e: PointerEvent) => {
+  _dragStartX = e.clientX;
+  _dragStartWidth = siderWidth.value;
+  (e.target as HTMLElement).setPointerCapture(e.pointerId);
+};
+
+const onResizeMove = (e: PointerEvent) => {
+  if (!(e.target as HTMLElement).hasPointerCapture(e.pointerId)) return;
+  siderWidth.value = Math.max(180, Math.min(600, _dragStartWidth + e.clientX - _dragStartX));
+};
+
+const onResizeEnd = (e: PointerEvent) => {
+  (e.target as HTMLElement).releasePointerCapture(e.pointerId);
+};
 </script>
 
 <template>
@@ -57,13 +76,17 @@ const openHelp = () => {
       <n-layout has-sider style="height: 100vh">
       <n-layout-sider
         bordered
-        collapse-mode="width"
-        :collapsed-width="64"
-        :width="280"
-        show-trigger
+        :width="siderWidth"
         :native-scrollbar="false"
-        style="position: relative; overflow: hidden"
+        style="position: relative; overflow: hidden; flex-shrink: 0"
       >
+        <!-- Resize handle -->
+        <div
+          style="position: absolute; top: 0; right: 0; width: 4px; height: 100%; cursor: ew-resize; z-index: 100; background: transparent"
+          @pointerdown="onResizeStart"
+          @pointermove="onResizeMove"
+          @pointerup="onResizeEnd"
+        />
         <!-- Chat history: fills full height, scrollable, with bottom padding to clear the nav -->
         <div style="display: flex; flex-direction: column; height: 100%">
           <div style="padding: 16px; padding-bottom: 8px; flex-shrink: 0">
