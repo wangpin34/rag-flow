@@ -3,7 +3,8 @@
     v-model:show="showModal"
     preset="card"
     title="Settings"
-    :style="{ width: '800px', maxHeight: '80vh' }"
+    :style="{ width: '100vw', height: '100vh', maxHeight: '100vh', borderRadius: 0, margin: 0 }"
+    :content-style="{ height: 'calc(100vh - 110px)', overflowY: 'auto' }"
     :segmented="{ content: 'soft' }"
   >
     <n-tabs type="line" animated>
