@@ -51,24 +51,7 @@
       </n-tab-pane>
 
       <n-tab-pane name="knowledge" tab="Knowledge Bases">
-        <n-empty description="Knowledge base management coming soon" style="margin-top: 40px">
-          <template #icon>
-            <n-icon size="48">
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-              >
-                <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
-                <path
-                  d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"
-                />
-              </svg>
-            </n-icon>
-          </template>
-        </n-empty>
+        <KnowledgeBaseManager />
       </n-tab-pane>
     </n-tabs>
   </n-modal>
@@ -106,7 +89,6 @@
 import {
   NButton,
   NDataTable,
-  NEmpty,
   NForm,
   NFormItem,
   NIcon,
@@ -121,6 +103,7 @@ import {
   type DataTableColumns,
 } from 'naive-ui';
 import { computed, h, onMounted, ref, watch } from 'vue';
+import KnowledgeBaseManager from './KnowledgeBaseManager.vue';
 import ProviderDetails from './ProviderDetails.vue';
 
 const props = defineProps<{

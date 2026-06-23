@@ -88,6 +88,21 @@ const api = {
     setLastUsedModelId: (modelId: number) => 
       ipcRenderer.invoke('settings:setLastUsedModelId', modelId),
   },
+
+  // Collection (Knowledge Base) operations
+  collection: {
+    create: (data: { name: string; description?: string }) =>
+      ipcRenderer.invoke('collection:create', data),
+    findAll: () => ipcRenderer.invoke('collection:findAll'),
+    findById: (id: number) => ipcRenderer.invoke('collection:findById', id),
+    getDocuments: (collectionId: number) =>
+      ipcRenderer.invoke('collection:getDocuments', collectionId),
+    addDocument: (collectionId: number, data: { content: string; fileName: string }) =>
+      ipcRenderer.invoke('collection:addDocument', collectionId, data),
+    removeDocument: (documentId: number) =>
+      ipcRenderer.invoke('collection:removeDocument', documentId),
+    delete: (id: number) => ipcRenderer.invoke('collection:delete', id),
+  },
 };
 
 // Use `contextBridge` APIs to expose Electron APIs to

@@ -64,6 +64,15 @@ declare global {
         getLastUsedModelId: () => Promise<number | null>;
         setLastUsedModelId: (modelId: number) => Promise<any>;
       };
+      collection: {
+        create: (data: { name: string; description?: string }) => Promise<any>;
+        findAll: () => Promise<Array<{ id: number; name: string; description: string | null; createdAt: string; updatedAt: string; documentCount: number }>>;
+        findById: (id: number) => Promise<any>;
+        getDocuments: (collectionId: number) => Promise<Array<{ id: number; source: string | null; createdAt: string }>>;
+        addDocument: (collectionId: number, data: { content: string; fileName: string }) => Promise<any>;
+        removeDocument: (documentId: number) => Promise<any>;
+        delete: (id: number) => Promise<any>;
+      };
     };
   }
 }

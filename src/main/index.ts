@@ -5,6 +5,7 @@ import { join } from 'path';
 import { providerApiService } from './lib/provider-api.service';
 import { vectorDatabaseService } from './lib/vector-database.service';
 import { chatService } from './repository/chat.service';
+import { collectionService } from './repository/collection.service';
 import { documentService } from './repository/document.service';
 import { modelService } from './repository/model.service';
 import { prismaService } from './repository/prisma.service';
@@ -309,6 +310,35 @@ app.whenReady().then(async () => {
 
   ipcMain.handle('settings:setLastUsedModelId', async (_event, modelId: number) => {
     return settingsService.setLastUsedModelId(modelId);
+  });
+
+  // Collection (Knowledge Base) IPC handlers
+  ipcMain.handle('collection:create', async (_event, data) => {
+    return collectionService.create(data);
+  });
+
+  ipcMain.handle('collection:findAll', async () => {
+    return collectionService.findAll();
+  });
+
+  ipcMain.handle('collection:findById', async (_event, id: number) => {
+    return collectionService.findById(id);
+  });
+
+  ipcMain.handle('collection:getDocuments', async (_event, collectionId: number) => {
+    return collectionService.getDocuments(collectionId);
+  });
+
+  ipcMain.handle('collection:addDocument', async (_event, collectionId: number, data: { content: string; fileName: string }) => {
+    return collectionService.addDocument(collectionId, data);
+  });
+
+  ipcMain.handle('collection:removeDocument', async (_event, documentId: number) => {
+    return collectionService.removeDocument(documentId);
+  });
+
+  ipcMain.handle('collection:delete', async (_event, id: number) => {
+    return collectionService.delete(id);
   });
 
   createWindow();
