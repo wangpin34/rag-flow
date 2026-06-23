@@ -50,9 +50,14 @@ const openHelp = () => {
   console.log('Help clicked');
 };
 
+const siderVisible = ref(true);
 const siderWidth = ref(280);
 let _dragStartX = 0;
 let _dragStartWidth = 280;
+
+const toggleSider = () => {
+  siderVisible.value = !siderVisible.value;
+};
 
 const onResizeStart = (e: PointerEvent) => {
   _dragStartX = e.clientX;
@@ -75,6 +80,7 @@ const onResizeEnd = (e: PointerEvent) => {
     <n-message-provider>
       <n-layout has-sider style="height: 100vh">
       <n-layout-sider
+        v-if="siderVisible"
         bordered
         :width="siderWidth"
         :native-scrollbar="false"
@@ -89,7 +95,17 @@ const onResizeEnd = (e: PointerEvent) => {
         />
         <!-- Chat history: fills full height, scrollable, with bottom padding to clear the nav -->
         <div style="display: flex; flex-direction: column; height: 100%">
-          <div style="padding: 12px 16px 8px; flex-shrink: 0; display: flex; justify-content: flex-end">
+          <div style="padding: 12px 16px 8px; flex-shrink: 0; display: flex; justify-content: space-between; align-items: center">
+            <n-button circle @click="toggleSider" title="Hide sidebar">
+              <template #icon>
+                <n-icon>
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+                    <line x1="9" y1="3" x2="9" y2="21" />
+                  </svg>
+                </n-icon>
+              </template>
+            </n-button>
             <n-button circle type="primary" @click="handleNewChat" title="New Chat">
               <template #icon>
                 <n-icon>
@@ -184,7 +200,20 @@ const onResizeEnd = (e: PointerEvent) => {
         </div>
       </n-layout-sider>
 
-      <n-layout-content :native-scrollbar="false" style="height: 100vh; overflow: hidden">
+      <n-layout-content :native-scrollbar="false" style="height: 100vh; overflow: hidden; position: relative">
+        <!-- Toggle button shown when sidebar is hidden -->
+        <div v-if="!siderVisible" style="position: absolute; top: 12px; left: 12px; z-index: 10">
+          <n-button circle @click="toggleSider" title="Show sidebar">
+            <template #icon>
+              <n-icon>
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+                  <line x1="9" y1="3" x2="9" y2="21" />
+                </svg>
+              </n-icon>
+            </template>
+          </n-button>
+        </div>
         <ChatView
           :chat-id="selectedChatId"
           @chat-created="handleChatCreated"
