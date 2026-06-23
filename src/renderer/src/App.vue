@@ -89,8 +89,8 @@ const onResizeEnd = (e: PointerEvent) => {
         />
         <!-- Chat history: fills full height, scrollable, with bottom padding to clear the nav -->
         <div style="display: flex; flex-direction: column; height: 100%">
-          <div style="padding: 16px; padding-bottom: 8px; flex-shrink: 0">
-            <n-button type="primary" block @click="handleNewChat">
+          <div style="padding: 12px 16px 8px; flex-shrink: 0; display: flex; justify-content: flex-end">
+            <n-button circle type="primary" @click="handleNewChat" title="New Chat">
               <template #icon>
                 <n-icon>
                   <svg
@@ -100,12 +100,11 @@ const onResizeEnd = (e: PointerEvent) => {
                     stroke="currentColor"
                     stroke-width="2"
                   >
-                    <line x1="12" y1="5" x2="12" y2="19" />
-                    <line x1="5" y1="12" x2="19" y2="12" />
+                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
                   </svg>
                 </n-icon>
               </template>
-              New Chat
             </n-button>
           </div>
           <div style="flex: 1; overflow-y: auto; padding-bottom: 120px">
