@@ -128,6 +128,43 @@ export class ProviderApiService {
       throw error;
     }
   }
+
+  /**
+   * Generate an embedding vector for a piece of text using a configured model.
+   * Supports Ollama and OpenAI-compatible providers.
+   */
+  async generateEmbedding(
+    provider: { name: string; apiEndpoint: string | null },
+    modelName: string,
+    text: string,
+    apiKey?: string,
+  ): Promise<number[]> {
+    const name = provider.name.toLowerCase();
+    const endpoint = provider.apiEndpoint ?? (name === 'openai' ? 'https://api.openai.com/v1' : 'http://localhost:11434');
+
+    if (name === 'ollama') {
+      const response = await fetch(`${endpoint}/api/embeddings`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ model: modelName, prompt: text }),
+      });
+      if (!response.ok) throw new Error(`Ollama embedding error: ${response.statusText}`);
+      const data: any = await response.json();
+      return data.embedding as number[];
+    }
+
+    // OpenAI-compatible
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    if (apiKey) headers['Authorization'] = `Bearer ${apiKey}`;
+    const response = await fetch(`${endpoint}/embeddings`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ model: modelName, input: text }),
+    });
+    if (!response.ok) throw new Error(`Embedding error: ${response.statusText}`);
+    const data: any = await response.json();
+    return data.data[0].embedding as number[];
+  }
 }
 
 export const providerApiService = new ProviderApiService();

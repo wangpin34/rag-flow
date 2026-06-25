@@ -103,6 +103,20 @@ const api = {
       ipcRenderer.invoke('collection:removeDocument', documentId),
     getDocumentDetail: (documentId: number) =>
       ipcRenderer.invoke('collection:getDocumentDetail', documentId),
+    getConfig: (collectionId: number) =>
+      ipcRenderer.invoke('collection:getConfig', collectionId),
+    setConfig: (collectionId: number, config: any) =>
+      ipcRenderer.invoke('collection:setConfig', collectionId, config),
+    getDocumentsWithStatus: (collectionId: number) =>
+      ipcRenderer.invoke('collection:getDocumentsWithStatus', collectionId),
+    parseDocument: (documentId: number, parserConfig: any) =>
+      ipcRenderer.invoke('collection:parseDocument', documentId, parserConfig),
+    embedDocument: (documentId: number, embeddingModelId: number) =>
+      ipcRenderer.invoke('collection:embedDocument', documentId, embeddingModelId),
+    processDocument: (documentId: number, collectionConfig: any) =>
+      ipcRenderer.invoke('collection:processDocument', documentId, collectionConfig),
+    processAll: (collectionId: number, collectionConfig: any) =>
+      ipcRenderer.invoke('collection:processAll', collectionId, collectionConfig),
     delete: (id: number) => ipcRenderer.invoke('collection:delete', id),
   },
 };

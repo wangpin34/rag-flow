@@ -2,6 +2,7 @@ import { electronApp, is, optimizer } from '@electron-toolkit/utils';
 import { app, BrowserWindow, ipcMain, shell } from 'electron';
 import { join } from 'path';
 // import icon from '../../resources/icon.png?asset';
+import { documentProcessorService } from './lib/document-processor.service';
 import { providerApiService } from './lib/provider-api.service';
 import { vectorDatabaseService } from './lib/vector-database.service';
 import { chatService } from './repository/chat.service';
@@ -339,6 +340,34 @@ app.whenReady().then(async () => {
 
   ipcMain.handle('collection:getDocumentDetail', async (_event, documentId: number) => {
     return collectionService.getDocumentDetail(documentId);
+  });
+
+  ipcMain.handle('collection:getConfig', async (_event, collectionId: number) => {
+    return collectionService.getConfig(collectionId);
+  });
+
+  ipcMain.handle('collection:setConfig', async (_event, collectionId: number, config) => {
+    return collectionService.setConfig(collectionId, config);
+  });
+
+  ipcMain.handle('collection:getDocumentsWithStatus', async (_event, collectionId: number) => {
+    return collectionService.getDocumentsWithStatus(collectionId);
+  });
+
+  ipcMain.handle('collection:parseDocument', async (_event, documentId: number, parserConfig) => {
+    return documentProcessorService.parseDocument(documentId, parserConfig);
+  });
+
+  ipcMain.handle('collection:embedDocument', async (_event, documentId: number, embeddingModelId: number) => {
+    return documentProcessorService.embedDocument(documentId, embeddingModelId);
+  });
+
+  ipcMain.handle('collection:processDocument', async (_event, documentId: number, collectionConfig) => {
+    return documentProcessorService.processDocument(documentId, collectionConfig);
+  });
+
+  ipcMain.handle('collection:processAll', async (_event, collectionId: number, collectionConfig) => {
+    return documentProcessorService.processAll(collectionId, collectionConfig);
   });
 
   ipcMain.handle('collection:delete', async (_event, id: number) => {

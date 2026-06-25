@@ -1,4 +1,5 @@
 import type { Collection } from '@prisma/client';
+import { DEFAULT_COLLECTION_CONFIG, type CollectionConfig } from '../lib/document-processor.service';
 import { prismaService } from './prisma.service';
 
 class CollectionService {
@@ -62,7 +63,59 @@ class CollectionService {
     await prismaService.db.document.deleteMany({
       where: { metadata: { contains: `"collectionId":${id}` } },
     });
+    // Clean up config setting
+    await prismaService.db.settings.deleteMany({
+      where: { key: `collection_config_${id}` },
+    });
     return prismaService.db.collection.delete({ where: { id } });
+  }
+
+  async getConfig(collectionId: number): Promise<CollectionConfig> {
+    const setting = await prismaService.db.settings.findUnique({
+      where: { key: `collection_config_${collectionId}` },
+    });
+    if (!setting) return { ...DEFAULT_COLLECTION_CONFIG };
+    try {
+      return JSON.parse(setting.value) as CollectionConfig;
+    } catch {
+      return { ...DEFAULT_COLLECTION_CONFIG };
+    }
+  }
+
+  async setConfig(collectionId: number, config: CollectionConfig): Promise<void> {
+    await prismaService.db.settings.upsert({
+      where: { key: `collection_config_${collectionId}` },
+      create: { key: `collection_config_${collectionId}`, value: JSON.stringify(config) },
+      update: { value: JSON.stringify(config) },
+    });
+  }
+
+  async getDocumentsWithStatus(collectionId: number) {
+    const docs = await prismaService.db.document.findMany({
+      where: { metadata: { contains: `"collectionId":${collectionId}` } },
+      orderBy: { createdAt: 'desc' },
+      select: { id: true, source: true, createdAt: true, metadata: true },
+    });
+
+    return docs.map((doc) => {
+      let meta: Record<string, any> = {};
+      try {
+        meta = doc.metadata ? JSON.parse(doc.metadata) : {};
+      } catch {
+        meta = {};
+      }
+      return {
+        id: doc.id,
+        source: doc.source,
+        createdAt: doc.createdAt,
+        parsed: meta.parsed ?? false,
+        parsedAt: meta.parsedAt ?? null,
+        chunkCount: meta.chunkCount ?? 0,
+        embedded: meta.embedded ?? false,
+        embeddedAt: meta.embeddedAt ?? null,
+        error: meta.error ?? null,
+      };
+    });
   }
 }
 

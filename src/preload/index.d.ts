@@ -80,6 +80,22 @@ declare global {
           updatedAt: string;
           chunks: Array<{ id: number; chunkIndex: number; content: string; metadata: string | null; createdAt: string }>;
         } | null>;
+        getConfig: (collectionId: number) => Promise<{
+          parser: { strategy: 'paragraph' | 'fixed-size' | 'sentence'; chunkSize: number; chunkOverlap: number };
+          embeddingModelId: number | null;
+          rerankModelId: number | null;
+          autoProcess: boolean;
+        }>;
+        setConfig: (collectionId: number, config: any) => Promise<void>;
+        getDocumentsWithStatus: (collectionId: number) => Promise<Array<{
+          id: number; source: string | null; createdAt: string;
+          parsed: boolean; parsedAt: string | null; chunkCount: number;
+          embedded: boolean; embeddedAt: string | null; error: string | null;
+        }>>;
+        parseDocument: (documentId: number, parserConfig: any) => Promise<{ chunkCount: number }>;
+        embedDocument: (documentId: number, embeddingModelId: number) => Promise<void>;
+        processDocument: (documentId: number, collectionConfig: any) => Promise<void>;
+        processAll: (collectionId: number, collectionConfig: any) => Promise<{ processed: number; errors: number }>;
         delete: (id: number) => Promise<any>;
       };
     };
