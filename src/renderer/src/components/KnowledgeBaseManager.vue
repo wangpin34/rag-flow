@@ -163,27 +163,27 @@
 
 <script setup lang="ts">
 import {
-  NButton,
-  NDataTable,
-  NDivider,
-  NEmpty,
-  NForm,
-  NFormItem,
-  NIcon,
-  NInput,
-  NInputNumber,
-  NModal,
-  NScrollbar,
-  NSelect,
-  NSpace,
-  NSpin,
-  NSwitch,
-  NTabPane,
-  NTabs,
-  NTag,
-  NText,
-  useMessage,
-  type DataTableColumns,
+    NButton,
+    NDataTable,
+    NDivider,
+    NEmpty,
+    NForm,
+    NFormItem,
+    NIcon,
+    NInput,
+    NInputNumber,
+    NModal,
+    NScrollbar,
+    NSelect,
+    NSpace,
+    NSpin,
+    NSwitch,
+    NTabPane,
+    NTabs,
+    NTag,
+    NText,
+    useMessage,
+    type DataTableColumns,
 } from 'naive-ui';
 import { computed, h, onMounted, ref } from 'vue';
 
@@ -315,7 +315,8 @@ const saveConfig = async () => {
   if (!configCollection.value) return;
   configSaving.value = true;
   try {
-    await window.api.collection.setConfig(configCollection.value.id, { ...configForm.value });
+    const plainConfig = JSON.parse(JSON.stringify(configForm.value));
+    await window.api.collection.setConfig(configCollection.value.id, plainConfig);
     message.success('Configuration saved');
     showConfig.value = false;
   } catch { message.error('Failed to save configuration'); }
