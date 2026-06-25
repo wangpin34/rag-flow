@@ -4,56 +4,75 @@
     preset="card"
     title="Settings"
     :style="{ width: '100vw', height: '100vh', maxHeight: '100vh', borderRadius: 0, margin: 0 }"
-    :content-style="{ height: 'calc(100vh - 110px)', overflowY: 'auto' }"
+    :content-style="{ height: 'calc(100vh - 110px)', padding: 0, overflow: 'hidden' }"
     :segmented="{ content: 'soft' }"
   >
-    <n-tabs type="line" animated>
-      <n-tab-pane name="providers" tab="Model Providers">
-        <n-space vertical :size="16">
-          <n-button type="primary" @click="showAddProvider = true">
-            <template #icon>
-              <n-icon>
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="2"
-                >
-                  <line x1="12" y1="5" x2="12" y2="19" />
-                  <line x1="5" y1="12" x2="19" y2="12" />
-                </svg>
-              </n-icon>
-            </template>
-            Add Provider
-          </n-button>
+    <div style="display: flex; height: 100%; overflow: hidden">
+      <!-- Sidebar -->
+      <div style="width: 200px; flex-shrink: 0; border-right: 1px solid rgba(255,255,255,0.09); display: flex; flex-direction: column; padding: 12px 0; overflow-y: auto">
+        <div
+          v-for="item in navItems"
+          :key="item.key"
+          @click="activeSection = item.key"
+          :style="{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '10px',
+            padding: '9px 20px',
+            cursor: 'pointer',
+            borderRadius: '6px',
+            margin: '1px 8px',
+            fontSize: '14px',
+            background: activeSection === item.key ? 'rgba(255,255,255,0.1)' : 'transparent',
+            color: activeSection === item.key ? 'var(--n-text-color)' : 'var(--n-text-color-3)',
+            fontWeight: activeSection === item.key ? 500 : 400,
+            transition: 'background 0.15s',
+          }"
+        >
+          <n-icon size="16" v-html="item.icon" />
+          {{ item.label }}
+        </div>
+      </div>
 
-          <n-data-table
-            :columns="providerColumns"
-            :data="providers"
-            :pagination="false"
-            :bordered="false"
-          />
-        </n-space>
-      </n-tab-pane>
+      <!-- Content -->
+      <div style="flex: 1; overflow-y: auto; padding: 24px 28px">
+        <!-- Model Providers -->
+        <template v-if="activeSection === 'providers'">
+          <n-space vertical :size="16">
+            <n-button type="primary" @click="showAddProvider = true">
+              <template #icon>
+                <n-icon>
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <line x1="12" y1="5" x2="12" y2="19" />
+                    <line x1="5" y1="12" x2="19" y2="12" />
+                  </svg>
+                </n-icon>
+              </template>
+              Add Provider
+            </n-button>
+            <n-data-table :columns="providerColumns" :data="providers" :pagination="false" :bordered="false" />
+          </n-space>
+        </template>
 
-      <n-tab-pane name="models" tab="Models">
-        <n-space vertical :size="16">
-          <n-select
-            v-model:value="selectedProvider"
-            :options="providerOptions"
-            placeholder="Filter by provider"
-            clearable
-          />
+        <!-- Models -->
+        <template v-else-if="activeSection === 'models'">
+          <n-space vertical :size="16">
+            <n-select
+              v-model:value="selectedProvider"
+              :options="providerOptions"
+              placeholder="Filter by provider"
+              clearable
+            />
+            <n-data-table :columns="modelColumns" :data="filteredModels" :pagination="false" />
+          </n-space>
+        </template>
 
-          <n-data-table :columns="modelColumns" :data="filteredModels" :pagination="false" />
-        </n-space>
-      </n-tab-pane>
-
-      <n-tab-pane name="knowledge" tab="Knowledge Bases">
-        <KnowledgeBaseManager />
-      </n-tab-pane>
-    </n-tabs>
+        <!-- Knowledge Bases -->
+        <template v-else-if="activeSection === 'knowledge'">
+          <KnowledgeBaseManager />
+        </template>
+      </div>
+    </div>
   </n-modal>
 
   <!-- Add Provider Modal -->
@@ -97,8 +116,6 @@ import {
   NSelect,
   NSpace,
   NSwitch,
-  NTabPane,
-  NTabs,
   useMessage,
   type DataTableColumns,
 } from 'naive-ui';
@@ -119,6 +136,26 @@ const showModal = computed({
   get: () => props.show,
   set: (value) => emit('update:show', value),
 });
+
+const activeSection = ref('providers');
+
+const navItems = [
+  {
+    key: 'providers',
+    label: 'Model Providers',
+    icon: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>`,
+  },
+  {
+    key: 'models',
+    label: 'Models',
+    icon: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 2v4m0 12v4M4.22 4.22l2.83 2.83m9.9 9.9 2.83 2.83M2 12h4m12 0h4M4.22 19.78l2.83-2.83m9.9-9.9 2.83-2.83"/></svg>`,
+  },
+  {
+    key: 'knowledge',
+    label: 'Knowledge Bases',
+    icon: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>`,
+  },
+];
 
 const showAddProvider = ref(false);
 const selectedProvider = ref<number | null>(null);
