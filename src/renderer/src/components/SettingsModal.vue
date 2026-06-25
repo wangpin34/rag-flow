@@ -35,7 +35,9 @@
       </div>
 
       <!-- Content -->
-      <div style="flex: 1; overflow-y: auto; padding: 24px 28px">
+      <div :style="activeSection === 'knowledge'
+        ? 'flex: 1; overflow: hidden; display: flex; flex-direction: column'
+        : 'flex: 1; overflow-y: auto; padding: 24px 28px'">
         <!-- Model Providers -->
         <template v-if="activeSection === 'providers'">
           <n-space vertical :size="16">
@@ -69,7 +71,7 @@
 
         <!-- Knowledge Bases -->
         <template v-else-if="activeSection === 'knowledge'">
-          <KnowledgeBaseManager />
+          <KnowledgeBaseManager style="flex: 1; overflow: hidden; min-height: 0" />
         </template>
       </div>
     </div>
