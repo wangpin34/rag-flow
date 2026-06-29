@@ -473,8 +473,10 @@ app.whenReady().then(async () => {
       if (!doc) continue;
       const meta = (() => { try { return JSON.parse(doc.metadata as string ?? '{}'); } catch { return {}; } })();
       if (meta.collectionId !== undefined && meta.collectionId !== collectionId) continue;
-      for (const c of doc.chunks) {
-        chunks.push({ source: doc.source, chunkIndex: c.chunkIndex, content: c.content, score: hit.distance });
+      // Return only the first chunk as the representative content for this document hit
+      const firstChunk = doc.chunks[0];
+      if (firstChunk) {
+        chunks.push({ source: doc.source, chunkIndex: firstChunk.chunkIndex, content: firstChunk.content, score: hit.distance });
       }
     }
     return chunks;

@@ -82,31 +82,23 @@
 
           <div class="message-content markdown-body" v-html="parseMarkdown(displayContent(message))"></div>
 
-          <!-- Sources section (collapsible, only when sources were retrieved) -->
-          <details v-if="message.role === 'assistant' && getMessageMeta(message).sources?.length" class="sources-block">
-            <summary class="sources-summary">
-              <n-icon size="13" style="margin-right:4px; vertical-align:-2px">
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
-                </svg>
-              </n-icon>
-              {{ getMessageMeta(message).sources!.length }} source chunk{{ getMessageMeta(message).sources!.length > 1 ? 's' : '' }}
-            </summary>
-            <div class="sources-list">
-              <div
-                v-for="(src, idx) in getMessageMeta(message).sources"
-                :key="idx"
-                class="source-item"
-              >
-                <div class="source-label">
-                  <n-text depth="3" :style="{ fontSize: '11px', fontWeight: 600 }">[{{ idx + 1 }}]</n-text>
-                  <n-text depth="3" :style="{ fontSize: '11px', marginLeft: '4px' }">{{ src.source || 'Unknown source' }}</n-text>
-                  <n-text depth="3" :style="{ fontSize: '10px', marginLeft: '8px' }">score: {{ (1 - src.score).toFixed(3) }}</n-text>
-                </div>
-                <div class="source-content">{{ src.content }}</div>
-              </div>
-            </div>
-          </details>
+          <!-- Sources chips (only when sources were retrieved) -->
+          <div v-if="message.role === 'assistant' && getMessageMeta(message).sources?.length" class="sources-row">
+            <span class="sources-row-label">Sources:</span>
+            <button
+              v-for="(src, idx) in getMessageMeta(message).sources"
+              :key="idx"
+              class="source-chip"
+              @click="openSource(src, idx)"
+              :title="src.source || 'Unknown source'"
+            >
+              <svg class="source-chip-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/>
+              </svg>
+              <span class="source-chip-index">[{{ idx + 1 }}]</span>
+              <span class="source-chip-name">{{ shortName(src.source) }}</span>
+            </button>
+          </div>
         </div>
       </div>
 
@@ -192,6 +184,34 @@
         />
       </n-space>
     </n-modal>
+
+    <!-- Source chunk detail modal -->
+    <n-modal
+      v-model:show="showSourceModal"
+      :title="selectedSource ? `Chunk [${selectedSourceIdx + 1}]` : 'Source'"
+      preset="card"
+      :style="{ width: '560px', maxWidth: '90vw' }"
+      :bordered="false"
+    >
+      <template v-if="selectedSource">
+        <div class="source-modal-meta">
+          <div class="source-modal-row">
+            <span class="source-modal-key">File</span>
+            <span class="source-modal-value">{{ selectedSource.source || 'Unknown' }}</span>
+          </div>
+          <div class="source-modal-row">
+            <span class="source-modal-key">Chunk #</span>
+            <span class="source-modal-value"># {{ selectedSource.chunkIndex }}</span>
+          </div>
+          <div class="source-modal-row">
+            <span class="source-modal-key">Relevance</span>
+            <span class="source-modal-value source-modal-score">{{ ((1 - selectedSource.score) * 100).toFixed(1) }}%</span>
+          </div>
+        </div>
+        <div class="source-modal-divider"></div>
+        <div class="source-modal-content">{{ selectedSource.content }}</div>
+      </template>
+    </n-modal>
   </div>
 </template>
 
@@ -227,6 +247,24 @@ const pendingCustomHistory = ref<any[] | undefined>(undefined);
 const streamingThinking = ref('');
 const isThinkingPhase = ref(false);
 const pendingSourceChunks = ref<any[]>([]);
+
+// Source modal
+const showSourceModal = ref(false);
+const selectedSource = ref<{ source: string | null; chunkIndex: number; content: string; score: number } | null>(null);
+const selectedSourceIdx = ref(0);
+
+const openSource = (src: { source: string | null; chunkIndex: number; content: string; score: number }, idx: number) => {
+  selectedSource.value = src;
+  selectedSourceIdx.value = idx;
+  showSourceModal.value = true;
+};
+
+const shortName = (src: string | null): string => {
+  if (!src) return 'Unknown';
+  const parts = src.replace(/\\/g, '/').split('/');
+  const name = parts[parts.length - 1];
+  return name.length > 20 ? name.slice(0, 18) + '…' : name;
+};
 
 /** Parse <think>...</think> from a raw buffer accumulated during streaming. */
 function parseThinkingFromRaw(raw: string): { thinking: string; response: string; inThinking: boolean } {
@@ -490,14 +528,15 @@ const getAIResponse = async (userMessage: string, apiKey?: string, customHistory
     const finalParsed = parseThinkingFromRaw(rawBuffer);
     const metaObj: Record<string, any> = {};
     if (finalParsed.thinking) metaObj.thinking = finalParsed.thinking;
-    if (pendingSourceChunks.value.length > 0) metaObj.sources = pendingSourceChunks.value;
+    // Serialize reactive proxy array so it passes cleanly through Electron IPC
+    if (pendingSourceChunks.value.length > 0) metaObj.sources = JSON.parse(JSON.stringify(pendingSourceChunks.value));
 
     // Save the complete assistant response to database
     const assistantMessage = await window.api.chat.addMessage({
       chatId: currentChat.value!.id,
       role: 'assistant',
       content: finalParsed.response || rawBuffer,
-      metadata: Object.keys(metaObj).length > 0 ? JSON.stringify(metaObj) : undefined,
+      metadata: Object.keys(metaObj).length > 0 ? metaObj : undefined,
     });
 
     messages.value.push(assistantMessage);
@@ -722,61 +761,115 @@ onMounted(async () => {
   white-space: pre-wrap;
 }
 
-/* Sources block */
-.sources-block {
-  margin-top: 10px;
-  border: 1px solid #2e2e3a;
-  border-radius: 6px;
-  overflow: hidden;
-  background: #1c1c24;
-}
-
-.sources-summary {
-  padding: 6px 10px;
-  cursor: pointer;
-  user-select: none;
-  font-size: 12px;
-  color: #7a7a90;
+/* Sources chips row */
+.sources-row {
+  margin-top: 12px;
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  list-style: none;
-}
-
-.sources-summary::-webkit-details-marker { display: none; }
-
-.sources-block[open] .sources-summary {
-  border-bottom: 1px solid #2e2e3a;
-}
-
-.sources-list {
-  padding: 8px;
-  display: flex;
-  flex-direction: column;
   gap: 6px;
 }
 
-.source-item {
-  background: #232330;
-  border-radius: 4px;
-  padding: 8px 10px;
-  border-left: 2px solid #4a4a60;
+.sources-row-label {
+  font-size: 11px;
+  color: #606070;
+  margin-right: 2px;
+  white-space: nowrap;
 }
 
-.source-label {
-  margin-bottom: 4px;
+.source-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px 3px 6px;
+  border-radius: 4px;
+  background: #252530;
+  border: 1px solid #36364a;
+  color: #9090b0;
+  font-size: 11px;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+  white-space: nowrap;
+  max-width: 200px;
+}
+
+.source-chip:hover {
+  background: #2e2e42;
+  border-color: #5050a0;
+  color: #c0c0e0;
+}
+
+.source-chip-icon {
+  width: 11px;
+  height: 11px;
+  flex-shrink: 0;
+  opacity: 0.7;
+}
+
+.source-chip-index {
+  font-weight: 600;
+  color: #7070c0;
+  flex-shrink: 0;
+}
+
+.source-chip-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Source modal content */
+.source-modal-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.source-modal-row {
   display: flex;
   align-items: baseline;
-  gap: 2px;
+  gap: 10px;
 }
 
-.source-content {
-  font-size: 12px;
-  color: #8a8a9a;
-  line-height: 1.5;
+.source-modal-key {
+  font-size: 11px;
+  font-weight: 600;
+  color: #606070;
+  width: 64px;
+  flex-shrink: 0;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.source-modal-value {
+  font-size: 13px;
+  color: #c0c0d0;
+  word-break: break-all;
+}
+
+.source-modal-score {
+  color: #18a058;
+  font-weight: 600;
+}
+
+.source-modal-divider {
+  height: 1px;
+  background: #2c2c3a;
+  margin-bottom: 14px;
+}
+
+.source-modal-content {
+  font-size: 13px;
+  color: #b0b0c8;
+  line-height: 1.65;
   white-space: pre-wrap;
   word-break: break-word;
-  max-height: 120px;
+  max-height: 360px;
   overflow-y: auto;
+  background: #1a1a24;
+  border-radius: 6px;
+  padding: 12px 14px;
+  border: 1px solid #2a2a38;
 }
 
 @keyframes blink {
