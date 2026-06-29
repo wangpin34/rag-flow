@@ -313,7 +313,7 @@ const modelOptions = computed(() =>
   models.value
     .filter((m) => m.modelType === 'chat' && m.isActive && m.provider?.isActive)
     .map((m) => ({
-      label: m.displayName || m.name,
+      label: `${m.provider?.name ?? ''}/${m.displayName || m.name}`,
       value: m.id,
     }))
 );
