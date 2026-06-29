@@ -151,6 +151,16 @@
                 <n-form-item label="Auto Process on Upload">
                   <n-switch v-model:value="configForm.autoProcess" />
                 </n-form-item>
+                <n-divider title-placement="left" style="font-size: 13px; margin: 16px 0">Retrieval</n-divider>
+                <n-form-item label="Top-K Chunks">
+                  <n-input-number
+                    v-model:value="configForm.retrieveTopK"
+                    :min="1"
+                    :max="20"
+                    :step="1"
+                    style="width: 100%"
+                  />
+                </n-form-item>
                 <div style="margin-top: 20px">
                   <n-button type="primary" :loading="configSaving" @click="saveConfig">Save Configuration</n-button>
                 </div>
@@ -343,6 +353,7 @@ const configForm = ref({
   embeddingModelId: null as number | null,
   rerankModelId: null as number | null,
   autoProcess: false,
+  retrieveTopK: 4,
 });
 const embeddingModels = ref<any[]>([]);
 const chatModels = ref<any[]>([]);
@@ -434,6 +445,7 @@ const loadConfig = async (kbId: number) => {
     embeddingModelId: cfg.embeddingModelId,
     rerankModelId: cfg.rerankModelId,
     autoProcess: cfg.autoProcess,
+    retrieveTopK: cfg.retrieveTopK ?? 4,
   };
 };
 

@@ -442,10 +442,13 @@ app.whenReady().then(async () => {
     _event,
     collectionId: number,
     query: string,
-    topK: number,
+    _topK: number,
   ) => {
     const cfg = await collectionService.getConfig(collectionId);
     if (!cfg.embeddingModelId) return [];
+
+    // Use the KB-configured top-K, falling back to the caller-supplied value
+    const topK = cfg.retrieveTopK ?? _topK ?? 4;
 
     const model = await prismaService.db.model.findUnique({
       where: { id: cfg.embeddingModelId },

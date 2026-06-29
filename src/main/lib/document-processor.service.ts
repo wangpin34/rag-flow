@@ -13,6 +13,7 @@ export interface CollectionConfig {
   embeddingModelId: number | null;
   rerankModelId: number | null;
   autoProcess: boolean;
+  retrieveTopK: number;
 }
 
 export const DEFAULT_COLLECTION_CONFIG: CollectionConfig = {
@@ -20,6 +21,7 @@ export const DEFAULT_COLLECTION_CONFIG: CollectionConfig = {
   embeddingModelId: null,
   rerankModelId: null,
   autoProcess: false,
+  retrieveTopK: 4,
 };
 
 class DocumentProcessorService {
