@@ -210,7 +210,7 @@ const modelTypeOptions = [
 const isKnownProvider = computed(() => {
   if (!provider.value) return false;
   const name = provider.value.name.toLowerCase();
-  return name === 'ollama' || name === 'openai';
+  return name === 'ollama' || name === 'openai' || name === 'groq';
 });
 
 // Model columns
@@ -254,8 +254,9 @@ watch(showDrawer, (isOpen) => {
 const handleListModels = async () => {
   if (!provider.value) return;
 
-  // If OpenAI, ask for API key
-  if (provider.value.name.toLowerCase() === 'openai') {
+  // If provider needs an API key and none is stored, ask for one
+  const providerName = provider.value.name.toLowerCase();
+  if ((providerName === 'openai' || providerName === 'groq') && !provider.value.apiKey) {
     showApiKeyModal.value = true;
     return;
   }

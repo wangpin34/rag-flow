@@ -165,10 +165,13 @@ app.whenReady().then(async () => {
       if (provider.name.toLowerCase() === 'ollama') {
         models = await providerApiService.listOllamaModels(provider.apiEndpoint || 'http://localhost:11434/api');
       } else if (provider.name.toLowerCase() === 'openai') {
-        if (!apiKey) {
-          throw new Error('API key required for OpenAI');
-        }
-        models = await providerApiService.listOpenAIModels(provider.apiEndpoint || 'https://api.openai.com/v1', apiKey);
+        const key = apiKey || provider.apiKey || undefined;
+        if (!key) throw new Error('API key required for OpenAI');
+        models = await providerApiService.listOpenAIModels(provider.apiEndpoint || 'https://api.openai.com/v1', key);
+      } else if (provider.name.toLowerCase() === 'groq') {
+        const key = apiKey || provider.apiKey || undefined;
+        if (!key) throw new Error('API key required for Groq');
+        models = await providerApiService.listGroqModels(provider.apiEndpoint || 'https://api.groq.com/openai/v1', key);
       } else {
         throw new Error(`Unsupported provider: ${provider.name}`);
       }

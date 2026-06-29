@@ -130,6 +130,43 @@ export class ProviderApiService {
   }
 
   /**
+   * List models from Groq API (OpenAI-compatible)
+   */
+  async listGroqModels(apiEndpoint: string, apiKey: string): Promise<Array<{
+    name: string;
+    displayName: string;
+    modelType: string;
+    contextWindow: number | null;
+    embeddingDim: number | null;
+  }>> {
+    const response = await fetch(`${apiEndpoint}/models`, {
+      headers: { 'Authorization': `Bearer ${apiKey}` },
+    });
+    if (!response.ok) throw new Error(`Failed to fetch Groq models: ${response.statusText}`);
+    const data = await response.json();
+    const models: OpenAIModel[] = data.data || [];
+    const contextMap: Record<string, number> = {
+      'llama-3.3-70b-versatile': 128000,
+      'llama-3.1-8b-instant': 128000,
+      'llama3-70b-8192': 8192,
+      'llama3-8b-8192': 8192,
+      'mixtral-8x7b-32768': 32768,
+      'gemma2-9b-it': 8192,
+      'gemma-7b-it': 8192,
+      'deepseek-r1-distill-llama-70b': 128000,
+    };
+    return models
+      .filter((m) => !m.id.includes('whisper') && !m.id.includes('guard'))
+      .map((m) => ({
+        name: m.id,
+        displayName: m.id.split('-').map((w: string) => w.charAt(0).toUpperCase() + w.slice(1)).join(' '),
+        modelType: 'chat',
+        contextWindow: contextMap[m.id] ?? null,
+        embeddingDim: null,
+      }));
+  }
+
+  /**
    * Generate an embedding vector for a piece of text using a configured model.
    * Supports Ollama and OpenAI-compatible providers.
    */

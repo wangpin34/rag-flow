@@ -188,13 +188,18 @@ export class AiApiService {
 
     if (normalizedProvider === 'ollama') {
       return this.callOllamaStream(apiEndpoint, modelName, messages, onChunk);
-    } else if (normalizedProvider === 'openai') {
+    } else if (normalizedProvider === 'openai' || normalizedProvider === 'groq') {
       if (!apiKey) {
-        throw new Error('API key is required for OpenAI');
+        throw new Error(`API key is required for ${providerName}`);
+      }
+      const endpoint = apiEndpoint || (normalizedProvider === 'groq' ? 'https://api.groq.com/openai/v1' : 'https://api.openai.com/v1');
+      return this.callOpenAIStream(endpoint, apiKey, modelName, messages, onChunk);
+    } else {
+      // Treat any unknown provider as OpenAI-compatible
+      if (!apiKey) {
+        throw new Error(`API key is required for ${providerName}`);
       }
       return this.callOpenAIStream(apiEndpoint, apiKey, modelName, messages, onChunk);
-    } else {
-      throw new Error(`Unsupported provider: ${providerName}`);
     }
   }
 

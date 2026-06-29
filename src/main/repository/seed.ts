@@ -147,6 +147,47 @@ export async function seedDatabase() {
 
     console.log(`✓ Created ${openaiModels.length} OpenAI models (inactive)`);
 
+    // Seed Groq provider
+    const groq = await prismaService.db.provider.create({
+      data: {
+        name: 'Groq',
+        apiEndpoint: 'https://api.groq.com/openai/v1',
+        apiKeyName: null,
+        isActive: false,
+        config: JSON.stringify({
+          description: 'Groq Cloud API — fast inference',
+          requiresApiKey: true,
+        }),
+      },
+    });
+
+    console.log('✓ Created Groq provider (inactive)');
+
+    const groqModels = [
+      { name: 'llama-3.3-70b-versatile', displayName: 'Llama 3.3 70B Versatile', contextWindow: 128000 },
+      { name: 'llama-3.1-8b-instant', displayName: 'Llama 3.1 8B Instant', contextWindow: 128000 },
+      { name: 'llama3-70b-8192', displayName: 'Llama 3 70B', contextWindow: 8192 },
+      { name: 'llama3-8b-8192', displayName: 'Llama 3 8B', contextWindow: 8192 },
+      { name: 'mixtral-8x7b-32768', displayName: 'Mixtral 8x7B', contextWindow: 32768 },
+      { name: 'gemma2-9b-it', displayName: 'Gemma 2 9B', contextWindow: 8192 },
+      { name: 'deepseek-r1-distill-llama-70b', displayName: 'DeepSeek R1 Distill Llama 70B', contextWindow: 128000 },
+    ];
+
+    for (const model of groqModels) {
+      await prismaService.db.model.create({
+        data: {
+          ...model,
+          providerId: groq.id,
+          modelType: 'chat',
+          embeddingDim: null,
+          isActive: false,
+          config: null,
+        },
+      });
+    }
+
+    console.log(`✓ Created ${groqModels.length} Groq models (inactive)`);
+
     console.log('✓ Database seeding completed successfully');
   } catch (error) {
     console.error('✗ Database seeding failed:', error);
