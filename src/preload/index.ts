@@ -118,6 +118,8 @@ const api = {
     processAll: (collectionId: number, collectionConfig: any) =>
       ipcRenderer.invoke('collection:processAll', collectionId, collectionConfig),
     delete: (id: number) => ipcRenderer.invoke('collection:delete', id),
+    retrieve: (collectionId: number, query: string, topK: number) =>
+      ipcRenderer.invoke('collection:retrieve', collectionId, query, topK),
   },
 };
 

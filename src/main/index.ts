@@ -374,6 +374,69 @@ app.whenReady().then(async () => {
     return collectionService.delete(id);
   });
 
+  ipcMain.handle('collection:retrieve', async (
+    _event,
+    collectionId: number,
+    query: string,
+    topK: number,
+  ) => {
+    // 1. Load the KB config to find the embedding model
+    const cfg = await collectionService.getConfig(collectionId);
+    if (!cfg.embeddingModelId) throw new Error('No embedding model configured for this knowledge base');
+
+    const model = await prismaService.db.model.findUnique({
+      where: { id: cfg.embeddingModelId },
+      include: { provider: true },
+    });
+    if (!model) throw new Error(`Embedding model ${cfg.embeddingModelId} not found`);
+
+    // 2. Embed the query text
+    const apiKey = model.provider.apiKeyName ? process.env[model.provider.apiKeyName] : undefined;
+    const queryEmbedding = await providerApiService.generateEmbedding(
+      { name: model.provider.name, apiEndpoint: model.provider.apiEndpoint },
+      model.name,
+      query,
+      apiKey,
+    );
+
+    // 3. Vector search
+    const hits = vectorDatabaseService.searchSimilar(queryEmbedding, topK);
+
+    if (!hits.length) return [];
+
+    // 4. Load chunk + document info for each hit.
+    // Embeddings are stored per-document. Return all chunks so the UI can
+    // show the full document context. Chunks are ordered by chunkIndex.
+    const results = await Promise.all(
+      hits.map(async (hit) => {
+        const doc = await prismaService.db.document.findUnique({
+          where: { id: hit.document_id },
+          include: { chunks: { orderBy: { chunkIndex: 'asc' } } },
+        });
+
+        const meta = doc?.metadata ? (() => { try { return JSON.parse(doc.metadata as string); } catch { return {}; } })() : {};
+
+        return {
+          documentId: hit.document_id,
+          score: hit.distance,
+          source: doc?.source ?? null,
+          chunkCount: doc?.chunks?.length ?? 0,
+          chunks: (doc?.chunks ?? []).map((c) => ({ id: c.id, chunkIndex: c.chunkIndex, content: c.content })),
+          // Fallback: if no chunks yet, return truncated raw content
+          chunkContent: doc?.chunks?.length
+            ? doc.chunks.map((c) => c.content).join('\n\n---\n\n')
+            : (doc?.content?.slice(0, 500) ?? ''),
+          collectionId: (meta as any).collectionId ?? null,
+        };
+      })
+    );
+
+    // Filter to only docs that belong to this collection.
+    // collectionId is stored in document metadata when the document was added;
+    // fall back to including the result if metadata is missing/unparseable.
+    return results.filter((r) => r.collectionId === null || r.collectionId === collectionId);
+  });
+
   createWindow();
 
   app.on('activate', function () {

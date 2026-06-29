@@ -157,6 +157,84 @@
               </n-form>
             </div>
           </n-tab-pane>
+
+          <!-- ── Retrieve tab ── -->
+          <n-tab-pane name="retrieve" tab="Retrieve" display-directive="show" style="height: 100%; display: flex; flex-direction: column; overflow: hidden">
+            <div style="padding: 12px 20px 8px; flex-shrink: 0; display: flex; gap: 8px; align-items: flex-end">
+              <div style="flex: 1">
+                <n-input
+                  v-model:value="retrieveQuery"
+                  placeholder="Enter a query to retrieve relevant chunks…"
+                  @keydown.enter="handleRetrieve"
+                />
+              </div>
+              <div style="display: flex; align-items: center; gap: 6px; flex-shrink: 0">
+                <n-text depth="3" style="font-size: 13px; white-space: nowrap">Top K</n-text>
+                <n-input-number
+                  v-model:value="retrieveTopK"
+                  :min="1"
+                  :max="100"
+                  :step="1"
+                  style="width: 80px"
+                />
+              </div>
+              <n-button type="primary" :loading="retrieving" @click="handleRetrieve" style="flex-shrink: 0">Search</n-button>
+            </div>
+            <div style="flex: 1; overflow-y: auto; padding: 0 20px 16px">
+              <div v-if="retrieving" style="display:flex;justify-content:center;padding:48px">
+                <n-spin size="large" />
+              </div>
+              <n-empty
+                v-else-if="retrieveResults === null"
+                description="Enter a query and click Search to retrieve relevant chunks"
+                style="padding: 48px"
+              />
+              <n-empty
+                v-else-if="retrieveResults.length === 0"
+                description="No results found"
+                style="padding: 48px"
+              />
+              <template v-else>
+                <div style="padding: 8px 0 12px; font-size: 12px; color: var(--n-text-color-3)">
+                  {{ retrieveResults.length }} result{{ retrieveResults.length !== 1 ? 's' : '' }}
+                </div>
+                <div
+                  v-for="(r, i) in retrieveResults"
+                  :key="r.documentId + '-' + i"
+                  style="margin-bottom: 16px; border: 1px solid rgba(255,255,255,0.1); border-radius: 6px; overflow: hidden"
+                >
+                  <!-- Result header -->
+                  <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:8px 14px;background:rgba(255,255,255,0.05);border-bottom:1px solid rgba(255,255,255,0.08)">
+                    <div style="display:flex;align-items:center;gap:10px;min-width:0">
+                      <n-tag size="small" round type="info">#{{ i + 1 }}</n-tag>
+                      <n-text style="font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" :title="r.source ?? undefined">
+                        {{ r.source ?? 'Unknown file' }}
+                      </n-text>
+                      <n-text depth="3" style="font-size:12px;flex-shrink:0">{{ r.chunkCount }} chunk{{ r.chunkCount !== 1 ? 's' : '' }}</n-text>
+                    </div>
+                    <n-tag size="small" round type="success" style="flex-shrink:0">
+                      score {{ (1 / (1 + r.score)).toFixed(4) }}
+                    </n-tag>
+                  </div>
+                  <!-- All chunks of the matched document -->
+                  <template v-if="r.chunks && r.chunks.length">
+                    <div
+                      v-for="chunk in r.chunks"
+                      :key="chunk.id"
+                      style="border-bottom: 1px solid rgba(255,255,255,0.06)"
+                    >
+                      <div style="display:flex;align-items:center;gap:8px;padding:5px 14px;background:rgba(255,255,255,0.02)">
+                        <n-tag size="small" round style="font-size:11px">Chunk {{ chunk.chunkIndex + 1 }}</n-tag>
+                        <n-text depth="3" style="font-size:11px">{{ chunk.content.length }} chars</n-text>
+                      </div>
+                      <pre style="white-space: pre-wrap; word-break: break-all; font-size: 13px; font-family: monospace; margin: 0; padding: 10px 14px; line-height: 1.6">{{ chunk.content }}</pre>
+                    </div>
+                  </template>
+                  <pre v-else style="white-space: pre-wrap; word-break: break-all; font-size: 13px; font-family: monospace; margin: 0; padding: 12px 14px; line-height: 1.6">{{ r.chunkContent }}</pre>
+                </div>
+              </template>
+            </div>
+          </n-tab-pane>
         </n-tabs>
       </template>
     </div>
@@ -269,6 +347,29 @@ const configForm = ref({
 const embeddingModels = ref<any[]>([]);
 const chatModels = ref<any[]>([]);
 
+// ── Retrieve tab ──
+const retrieveQuery = ref('');
+const retrieveTopK = ref(10);
+const retrieving = ref(false);
+const retrieveResults = ref<any[] | null>(null);
+
+const handleRetrieve = async () => {
+  if (!selectedKb.value) return;
+  if (!retrieveQuery.value.trim()) { message.warning('Enter a query first'); return; }
+  retrieving.value = true;
+  try {
+    retrieveResults.value = await window.api.collection.retrieve(
+      selectedKb.value.id,
+      retrieveQuery.value.trim(),
+      retrieveTopK.value,
+    );
+  } catch (err: any) {
+    message.error(err?.message ?? 'Retrieval failed');
+  } finally {
+    retrieving.value = false;
+  }
+};
+
 const strategyOptions = [
   { label: 'Paragraph — split on blank lines', value: 'paragraph' },
   { label: 'Fixed Size — sliding window of N chars', value: 'fixed-size' },
@@ -356,9 +457,11 @@ const selectKb = async (kb: any) => {
 
 watch(selectedKb, (kb) => {
   if (!kb) return;
-  // reset chunk selection when switching KBs
+  // reset chunk + retrieve state when switching KBs
   chunksDocId.value = null;
   chunks.value = [];
+  retrieveQuery.value = '';
+  retrieveResults.value = null;
 });
 
 // ── Create KB ──

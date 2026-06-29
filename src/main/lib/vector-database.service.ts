@@ -37,20 +37,29 @@ class VectorDatabaseService {
   private initializeSchema(): void {
     if (!this.db) throw new Error('Database not connected');
 
-    // Drop any old virtual table created with the broken named-primary-key schema.
-    this.db.exec('DROP TABLE IF EXISTS vec_embeddings');
+    // Only drop and recreate if the OLD broken schema exists (had a named
+    // document_id PRIMARY KEY column). Do NOT drop unconditionally — that
+    // would wipe all stored embeddings on every app restart.
+    const existingDef = (this.db.prepare(
+      "SELECT sql FROM sqlite_master WHERE name = 'vec_embeddings' AND type = 'table'"
+    ).get() as { sql: string } | undefined)?.sql ?? '';
 
-    // sqlite-vec 0.1.x vec0 tables:
-    //  - Only support plain INSERT (no explicit rowid, no UPSERT, no ON CONFLICT).
-    //  - Deletes work via `rowid`.
-    //  - We track document_id → rowid in a companion regular table.
+    if (existingDef.includes('document_id')) {
+      // Old schema — tear everything down so we can start fresh.
+      this.db.exec('DROP TABLE IF EXISTS vec_embeddings');
+      this.db.exec('DROP TABLE IF EXISTS vec_embeddings_map');
+      console.log('⚠ Dropped old vec_embeddings schema (had named document_id column)');
+    }
+
+    // sqlite-vec 0.1.x vec0: only plain INSERT supported (no explicit rowid,
+    // no UPSERT, no ON CONFLICT). We map document_id → vec rowid ourselves.
     this.db.exec(`
       CREATE VIRTUAL TABLE IF NOT EXISTS vec_embeddings USING vec0(
         embedding FLOAT[768]
       );
     `);
 
-    // Companion table: maps Prisma document IDs to vec_embeddings rowids.
+    // Companion table that maps Prisma document IDs to vec_embeddings rowids.
     this.db.exec(`
       CREATE TABLE IF NOT EXISTS vec_embeddings_map (
         document_id INTEGER PRIMARY KEY,
@@ -122,24 +131,29 @@ class VectorDatabaseService {
   ): Array<{ document_id: number; distance: number }> {
     if (!this.db) throw new Error('Database not connected');
 
-    // vec0 KNN syntax: WHERE embedding MATCH ? AND k = ?
-    let query = `
-      SELECT
-        m.document_id,
-        v.distance
-      FROM vec_embeddings v
-      JOIN vec_embeddings_map m ON m.vec_rowid = v.rowid
-      WHERE v.embedding MATCH ?
-        AND v.k = ?
-    `;
-    const params: any[] = [JSON.stringify(queryEmbedding), limit];
+    // vec0 KNN queries MUST be a simple SELECT on the virtual table alone —
+    // JOINs inside the KNN query prevent the optimizer from using the index
+    // and return empty results. Run KNN first, then resolve document_ids.
+    const knnRows = this.db.prepare(`
+      SELECT rowid, distance
+      FROM vec_embeddings
+      WHERE embedding MATCH ?
+        AND k = ?
+    `).all(JSON.stringify(queryEmbedding), limit) as Array<{ rowid: number; distance: number }>;
 
-    if (maxDistance !== undefined) {
-      query += ' AND v.distance <= ?';
-      params.push(maxDistance);
+    if (!knnRows.length) return [];
+
+    const mapStmt = this.db.prepare(
+      'SELECT document_id FROM vec_embeddings_map WHERE vec_rowid = ?'
+    );
+
+    const results: Array<{ document_id: number; distance: number }> = [];
+    for (const row of knnRows) {
+      if (maxDistance !== undefined && row.distance > maxDistance) continue;
+      const mapped = mapStmt.get(row.rowid) as { document_id: number } | undefined;
+      if (mapped) results.push({ document_id: mapped.document_id, distance: row.distance });
     }
-
-    return this.db.prepare(query).all(...params) as Array<{ document_id: number; distance: number }>;
+    return results;
   }
 
   /**

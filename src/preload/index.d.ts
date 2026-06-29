@@ -97,6 +97,15 @@ declare global {
         processDocument: (documentId: number, collectionConfig: any) => Promise<void>;
         processAll: (collectionId: number, collectionConfig: any) => Promise<{ processed: number; errors: number }>;
         delete: (id: number) => Promise<any>;
+        retrieve: (collectionId: number, query: string, topK: number) => Promise<Array<{
+          documentId: number;
+          score: number;
+          source: string | null;
+          chunkContent: string;
+          chunkCount: number;
+          chunks: Array<{ id: number; chunkIndex: number; content: string }>;
+          collectionId: number | null;
+        }>>;
       };
     };
   }
