@@ -391,7 +391,7 @@ app.whenReady().then(async () => {
     if (!model) throw new Error(`Embedding model ${cfg.embeddingModelId} not found`);
 
     // 2. Embed the query text
-    const apiKey = model.provider.apiKeyName ? process.env[model.provider.apiKeyName] : undefined;
+    const apiKey = model.provider.apiKey || (model.provider.apiKeyName ? process.env[model.provider.apiKeyName] : undefined);
     const queryEmbedding = await providerApiService.generateEmbedding(
       { name: model.provider.name, apiEndpoint: model.provider.apiEndpoint },
       model.name,
@@ -456,7 +456,7 @@ app.whenReady().then(async () => {
     });
     if (!model) return [];
 
-    const apiKey = model.provider.apiKeyName ? process.env[model.provider.apiKeyName] : undefined;
+    const apiKey = model.provider.apiKey || (model.provider.apiKeyName ? process.env[model.provider.apiKeyName] : undefined);
     const queryEmbedding = await providerApiService.generateEmbedding(
       { name: model.provider.name, apiEndpoint: model.provider.apiEndpoint },
       model.name,

@@ -62,7 +62,8 @@ model Provider {
   id          Int      @id @default(autoincrement())
   name        String   @unique  // e.g., "OpenAI", "Anthropic", "Cohere", "Local"
   apiEndpoint String?  // Base API endpoint URL
-  apiKeyName  String?  // Environment variable name for API key
+  apiKeyName  String?  // Deprecated: was env var name; kept for migration compat
+  apiKey      String?  // The actual API key secret (stored locally on device)
   isActive    Boolean  @default(true)
   config      String?  // JSON string for provider-specific configuration
   createdAt   DateTime @default(now())

@@ -508,6 +508,8 @@ const getAIResponse = async (userMessage: string, apiKey?: string, customHistory
     }
 
     // Call the AI API with streaming
+    // Use the stored provider apiKey if the caller didn't supply one explicitly
+    const resolvedApiKey = apiKey || model.provider.apiKey || undefined;
     await aiApiService.chatStream(
       model.provider.name,
       model.provider.apiEndpoint || '',
@@ -521,7 +523,7 @@ const getAIResponse = async (userMessage: string, apiKey?: string, customHistory
         isThinkingPhase.value = parsed.inThinking;
         scrollToBottom();
       },
-      apiKey
+      resolvedApiKey
     );
 
     // Parse final content and build metadata

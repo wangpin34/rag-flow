@@ -86,8 +86,8 @@
       <n-form-item label="API Endpoint">
         <n-input v-model:value="newProvider.apiEndpoint" placeholder="https://api.openai.com/v1" />
       </n-form-item>
-      <n-form-item label="API Key Name">
-        <n-input v-model:value="newProvider.apiKeyName" placeholder="OPENAI_API_KEY" />
+      <n-form-item label="API Key">
+        <n-input v-model:value="newProvider.apiKey" type="password" show-password-on="click" placeholder="sk-..." />
       </n-form-item>
     </n-form>
     <template #action>
@@ -169,14 +169,18 @@ const selectedProviderId = ref<number | null>(null);
 const newProvider = ref({
   name: '',
   apiEndpoint: '',
-  apiKeyName: '',
+  apiKey: '',
 });
 
 // Provider columns
 const providerColumns: DataTableColumns<any> = [
   { title: 'Name', key: 'name' },
   { title: 'API Endpoint', key: 'apiEndpoint', ellipsis: { tooltip: true } },
-  { title: 'API Key', key: 'apiKeyName' },
+  {
+    title: 'API Key',
+    key: 'apiKey',
+    render: (row) => row.apiKey ? '••••••••' : '—',
+  },
   {
     title: 'Active',
     key: 'isActive',
@@ -251,11 +255,11 @@ const handleAddProvider = async () => {
     await window.api.provider.create({
       name: newProvider.value.name,
       apiEndpoint: newProvider.value.apiEndpoint || null,
-      apiKeyName: newProvider.value.apiKeyName || null,
+      apiKey: newProvider.value.apiKey || null,
     });
     message.success('Provider added successfully');
     showAddProvider.value = false;
-    newProvider.value = { name: '', apiEndpoint: '', apiKeyName: '' };
+    newProvider.value = { name: '', apiEndpoint: '', apiKey: '' };
     await loadData();
   } catch (error) {
     message.error('Failed to add provider');

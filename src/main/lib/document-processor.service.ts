@@ -120,7 +120,7 @@ class DocumentProcessorService {
     });
     if (!model) throw new Error(`Embedding model ${embeddingModelId} not found`);
 
-    const apiKey = model.provider.apiKeyName ? process.env[model.provider.apiKeyName] : undefined;
+    const apiKey = model.provider.apiKey || (model.provider.apiKeyName ? process.env[model.provider.apiKeyName] : undefined);
     const text = doc.content.slice(0, 8192);
     const embedding = await providerApiService.generateEmbedding(
       { name: model.provider.name, apiEndpoint: model.provider.apiEndpoint },
