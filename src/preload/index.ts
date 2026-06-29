@@ -120,6 +120,8 @@ const api = {
     delete: (id: number) => ipcRenderer.invoke('collection:delete', id),
     retrieve: (collectionId: number, query: string, topK: number) =>
       ipcRenderer.invoke('collection:retrieve', collectionId, query, topK),
+    retrieveChunks: (collectionId: number, query: string, topK: number) =>
+      ipcRenderer.invoke('collection:retrieveChunks', collectionId, query, topK),
   },
 };
 

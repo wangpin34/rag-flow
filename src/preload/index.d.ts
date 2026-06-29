@@ -106,6 +106,12 @@ declare global {
           chunks: Array<{ id: number; chunkIndex: number; content: string }>;
           collectionId: number | null;
         }>>;
+        retrieveChunks: (collectionId: number, query: string, topK: number) => Promise<Array<{
+          source: string | null;
+          chunkIndex: number;
+          content: string;
+          score: number;
+        }>>;
       };
     };
   }

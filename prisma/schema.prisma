@@ -96,13 +96,14 @@ model Model {
 
 // Chat/Conversation model
 model Chat {
-  id          Int       @id @default(autoincrement())
-  title       String    // Auto-generated or user-defined
-  modelId     Int
-  model       Model     @relation(fields: [modelId], references: [id])
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-  messages    Message[]
+  id           Int       @id @default(autoincrement())
+  title        String    // Auto-generated or user-defined
+  modelId      Int
+  model        Model     @relation(fields: [modelId], references: [id])
+  collectionId Int?      // Optional linked knowledge base
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  messages     Message[]
   
   @@map("chats")
   @@index([modelId])

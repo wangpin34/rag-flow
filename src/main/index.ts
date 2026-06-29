@@ -437,6 +437,49 @@ app.whenReady().then(async () => {
     return results.filter((r) => r.collectionId === null || r.collectionId === collectionId);
   });
 
+  // Lightweight retrieve for chat context: returns top-K chunks as plain text strings.
+  ipcMain.handle('collection:retrieveChunks', async (
+    _event,
+    collectionId: number,
+    query: string,
+    topK: number,
+  ) => {
+    const cfg = await collectionService.getConfig(collectionId);
+    if (!cfg.embeddingModelId) return [];
+
+    const model = await prismaService.db.model.findUnique({
+      where: { id: cfg.embeddingModelId },
+      include: { provider: true },
+    });
+    if (!model) return [];
+
+    const apiKey = model.provider.apiKeyName ? process.env[model.provider.apiKeyName] : undefined;
+    const queryEmbedding = await providerApiService.generateEmbedding(
+      { name: model.provider.name, apiEndpoint: model.provider.apiEndpoint },
+      model.name,
+      query,
+      apiKey,
+    );
+
+    const hits = vectorDatabaseService.searchSimilar(queryEmbedding, topK);
+    if (!hits.length) return [];
+
+    const chunks: Array<{ source: string | null; chunkIndex: number; content: string; score: number }> = [];
+    for (const hit of hits) {
+      const doc = await prismaService.db.document.findUnique({
+        where: { id: hit.document_id },
+        include: { chunks: { orderBy: { chunkIndex: 'asc' } } },
+      });
+      if (!doc) continue;
+      const meta = (() => { try { return JSON.parse(doc.metadata as string ?? '{}'); } catch { return {}; } })();
+      if (meta.collectionId !== undefined && meta.collectionId !== collectionId) continue;
+      for (const c of doc.chunks) {
+        chunks.push({ source: doc.source, chunkIndex: c.chunkIndex, content: c.content, score: hit.distance });
+      }
+    }
+    return chunks;
+  });
+
   createWindow();
 
   app.on('activate', function () {

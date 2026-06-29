@@ -4,14 +4,24 @@
     <div class="chat-header">
       <n-space align="center" justify="space-between">
         <n-text strong>{{ currentChat?.title || 'New Chat' }}</n-text>
-        <n-select
-          v-model:value="selectedModelId"
-          :options="modelOptions"
-          placeholder="Select Model"
-          :style="{ width: '250px' }"
-          filterable
-          @update:value="handleModelChange"
-        />
+        <n-space align="center" :size="8">
+          <n-select
+            v-model:value="selectedKbId"
+            :options="kbOptions"
+            placeholder="No knowledge base"
+            clearable
+            :style="{ width: '200px' }"
+            @update:value="handleKbChange"
+          />
+          <n-select
+            v-model:value="selectedModelId"
+            :options="modelOptions"
+            placeholder="Select Model"
+            :style="{ width: '220px' }"
+            filterable
+            @update:value="handleModelChange"
+          />
+        </n-space>
       </n-space>
     </div>
 
@@ -135,7 +145,6 @@ import { NButton, NEmpty, NIcon, NInput, NModal, NSelect, NSpace, NSpin, NText, 
 import { computed, nextTick, onMounted, ref, watch } from 'vue';
 import { aiApiService } from '../lib/ai-api.service';
 import { parseMarkdown } from '../lib/markdown';
-
 interface Props {
   chatId?: number | null;
 }
@@ -160,6 +169,18 @@ const pendingApiCall = ref<(() => Promise<void>) | null>(null);
 const streamingMessage = ref('');
 const isStreaming = ref(false);
 const pendingCustomHistory = ref<any[] | undefined>(undefined);
+
+// Knowledge base
+const selectedKbId = ref<number | null>(null);
+const collections = ref<any[]>([]);
+const kbOptions = computed(() =>
+  collections.value.map((c) => ({ label: c.name, value: c.id }))
+);
+
+const loadCollections = async () => {
+  try { collections.value = await window.api.collection.findAll(); }
+  catch { /* non-critical */ }
+};
 
 // Model options for the dropdown
 const modelOptions = computed(() =>
@@ -201,6 +222,17 @@ const loadLastUsedModel = async () => {
   }
 };
 
+// Handle KB selection change
+const handleKbChange = async (kbId: number | null) => {
+  if (!currentChat.value) return;
+  try {
+    await window.api.chat.update(currentChat.value.id, { collectionId: kbId ?? null });
+    currentChat.value.collectionId = kbId ?? null;
+  } catch {
+    message.error('Failed to update knowledge base');
+  }
+};
+
 // Handle model selection change
 const handleModelChange = async (modelId: number) => {
   try {
@@ -232,6 +264,7 @@ const loadChat = async () => {
       currentChat.value = chat;
       messages.value = chat.messages || [];
       selectedModelId.value = chat.modelId;
+      selectedKbId.value = chat.collectionId ?? null;
       await scrollToBottom();
     }
   } catch (error) {
@@ -320,12 +353,28 @@ const getAIResponse = async (userMessage: string, apiKey?: string, customHistory
 
     // Build conversation history - use custom history if provided (for retry)
     const messagesToUse = customHistory || messages.value;
-    const conversationMessages = messagesToUse
+    const conversationMessages: Array<{ role: 'user' | 'assistant' | 'system'; content: string }> = messagesToUse
       .filter((m) => m.role !== 'system')
       .map((m) => ({
         role: m.role as 'user' | 'assistant',
         content: m.content,
       }));
+
+    // Inject KB context as a system message when a knowledge base is attached
+    if (selectedKbId.value) {
+      try {
+        const chunks = await window.api.collection.retrieveChunks(selectedKbId.value, userMessage, 4);
+        if (chunks.length > 0) {
+          const context = chunks.map((c: { source: string | null; chunkIndex: number; content: string; score: number }, i: number) => `[${i + 1}] ${c.source ? `(${c.source}) ` : ''}${c.content}`).join('\n\n');
+          conversationMessages.unshift({
+            role: 'system',
+            content: `Use the following context excerpts to answer the user's question. If the context does not contain relevant information, answer from your general knowledge.\n\n${context}`,
+          });
+        }
+      } catch {
+        // Non-critical — continue without context
+      }
+    }
 
     // Call the AI API with streaming
     await aiApiService.chatStream(
@@ -464,6 +513,7 @@ watch(
 onMounted(async () => {
   await loadModels();
   await loadLastUsedModel();
+  await loadCollections();
   await loadChat();
 });
 </script>

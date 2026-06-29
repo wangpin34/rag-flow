@@ -3,6 +3,7 @@ import { prismaService } from './prisma.service';
 export interface CreateChatData {
   title: string;
   modelId: number;
+  collectionId?: number | null;
 }
 
 export interface CreateMessageData {
@@ -15,6 +16,7 @@ export interface CreateMessageData {
 export interface UpdateChatData {
   title?: string;
   modelId?: number;
+  collectionId?: number | null;
 }
 
 class ChatService {
@@ -26,6 +28,7 @@ class ChatService {
       data: {
         title: data.title,
         modelId: data.modelId,
+        collectionId: data.collectionId ?? null,
       },
       include: {
         model: {
