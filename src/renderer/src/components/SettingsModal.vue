@@ -108,18 +108,18 @@
 
 <script setup lang="ts">
 import {
-  NButton,
-  NDataTable,
-  NForm,
-  NFormItem,
-  NIcon,
-  NInput,
-  NModal,
-  NSelect,
-  NSpace,
-  NSwitch,
-  useMessage,
-  type DataTableColumns,
+    NButton,
+    NDataTable,
+    NForm,
+    NFormItem,
+    NIcon,
+    NInput,
+    NModal,
+    NSelect,
+    NSpace,
+    NSwitch,
+    useMessage,
+    type DataTableColumns,
 } from 'naive-ui';
 import { computed, h, onMounted, ref, watch } from 'vue';
 import KnowledgeBaseManager from './KnowledgeBaseManager.vue';
