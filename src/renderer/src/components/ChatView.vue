@@ -65,16 +65,71 @@
               </n-button>
             </n-space>
           </div>
-          <div class="message-content markdown-body" v-html="parseMarkdown(message.content)"></div>
+
+          <!-- Thinking section (collapsible, only for assistant messages with thinking metadata) -->
+          <details v-if="message.role === 'assistant' && getMessageMeta(message).thinking" class="thinking-block" open>
+            <summary class="thinking-summary">
+              <n-icon size="13" style="margin-right:4px; vertical-align:-2px">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+                  <circle cx="12" cy="12" r="10"/>
+                </svg>
+              </n-icon>
+              Thinking process
+            </summary>
+            <div class="thinking-content markdown-body" v-html="parseMarkdown(getMessageMeta(message).thinking!)"></div>
+          </details>
+
+          <div class="message-content markdown-body" v-html="parseMarkdown(displayContent(message))"></div>
+
+          <!-- Sources section (collapsible, only when sources were retrieved) -->
+          <details v-if="message.role === 'assistant' && getMessageMeta(message).sources?.length" class="sources-block">
+            <summary class="sources-summary">
+              <n-icon size="13" style="margin-right:4px; vertical-align:-2px">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
+                </svg>
+              </n-icon>
+              {{ getMessageMeta(message).sources!.length }} source chunk{{ getMessageMeta(message).sources!.length > 1 ? 's' : '' }}
+            </summary>
+            <div class="sources-list">
+              <div
+                v-for="(src, idx) in getMessageMeta(message).sources"
+                :key="idx"
+                class="source-item"
+              >
+                <div class="source-label">
+                  <n-text depth="3" :style="{ fontSize: '11px', fontWeight: 600 }">[{{ idx + 1 }}]</n-text>
+                  <n-text depth="3" :style="{ fontSize: '11px', marginLeft: '4px' }">{{ src.source || 'Unknown source' }}</n-text>
+                  <n-text depth="3" :style="{ fontSize: '10px', marginLeft: '8px' }">score: {{ (1 - src.score).toFixed(3) }}</n-text>
+                </div>
+                <div class="source-content">{{ src.content }}</div>
+              </div>
+            </div>
+          </details>
         </div>
       </div>
 
-      <div v-if="isStreaming || (isLoading && streamingMessage)" class="message-wrapper">
+      <div v-if="isStreaming || (isLoading && (streamingMessage || streamingThinking))" class="message-wrapper">
         <div class="message message-assistant">
           <div class="message-header">
             <n-text strong>Assistant</n-text>
           </div>
-          <div class="message-content markdown-body">
+          <!-- Live thinking block while model is in <think> phase -->
+          <details v-if="streamingThinking" class="thinking-block" open>
+            <summary class="thinking-summary">
+              <n-spin v-if="isThinkingPhase" size="small" style="margin-right:6px;vertical-align:-3px" />
+              <n-icon v-else size="13" style="margin-right:4px; vertical-align:-2px">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+                  <circle cx="12" cy="12" r="10"/>
+                </svg>
+              </n-icon>
+              {{ isThinkingPhase ? 'Thinking...' : 'Thinking process' }}
+            </summary>
+            <div class="thinking-content markdown-body" v-html="parseMarkdown(streamingThinking)"></div>
+          </details>
+          <div class="message-content markdown-body" v-if="streamingMessage || !isThinkingPhase">
             <span v-html="parseMarkdown(streamingMessage)"></span>
             <span class="streaming-cursor">▊</span>
           </div>
@@ -169,6 +224,39 @@ const pendingApiCall = ref<(() => Promise<void>) | null>(null);
 const streamingMessage = ref('');
 const isStreaming = ref(false);
 const pendingCustomHistory = ref<any[] | undefined>(undefined);
+const streamingThinking = ref('');
+const isThinkingPhase = ref(false);
+const pendingSourceChunks = ref<any[]>([]);
+
+/** Parse <think>...</think> from a raw buffer accumulated during streaming. */
+function parseThinkingFromRaw(raw: string): { thinking: string; response: string; inThinking: boolean } {
+  const openIdx = raw.indexOf('<think>');
+  if (openIdx === -1) return { thinking: '', response: raw, inThinking: false };
+  const closeIdx = raw.indexOf('</think>', openIdx);
+  if (closeIdx !== -1) {
+    return {
+      thinking: raw.slice(openIdx + 7, closeIdx).trim(),
+      response: raw.slice(closeIdx + 8).trimStart(),
+      inThinking: false,
+    };
+  }
+  // Still inside the think block
+  return { thinking: raw.slice(openIdx + 7), response: '', inThinking: true };
+}
+
+/** Parse message metadata JSON safely. */
+function getMessageMeta(msg: any): { thinking?: string; sources?: Array<{ source: string | null; chunkIndex: number; content: string; score: number }> } {
+  try { return msg.metadata ? JSON.parse(msg.metadata) : {}; }
+  catch { return {}; }
+}
+
+/** Return the display content for a message, stripping any <think> block that may be in old messages. */
+function displayContent(msg: any): string {
+  const meta = getMessageMeta(msg);
+  if (meta.thinking !== undefined) return msg.content; // already stripped at save time
+  // Legacy: strip inline think tags
+  return msg.content.replace(/<think>[\s\S]*?<\/think>/g, '').trimStart();
+}
 
 // Knowledge base
 const selectedKbId = ref<number | null>(null);
@@ -342,7 +430,11 @@ const handleSendMessage = async () => {
 // Get AI response from API with streaming
 const getAIResponse = async (userMessage: string, apiKey?: string, customHistory?: any[]) => {
   streamingMessage.value = '';
+  streamingThinking.value = '';
+  isThinkingPhase.value = false;
   isStreaming.value = true;
+  pendingSourceChunks.value = [];
+  let rawBuffer = '';
   
   try {
     // Get the model details
@@ -365,6 +457,7 @@ const getAIResponse = async (userMessage: string, apiKey?: string, customHistory
       try {
         const chunks = await window.api.collection.retrieveChunks(selectedKbId.value, userMessage, 4);
         if (chunks.length > 0) {
+          pendingSourceChunks.value = chunks;
           const context = chunks.map((c: { source: string | null; chunkIndex: number; content: string; score: number }, i: number) => `[${i + 1}] ${c.source ? `(${c.source}) ` : ''}${c.content}`).join('\n\n');
           conversationMessages.unshift({
             role: 'system',
@@ -383,27 +476,43 @@ const getAIResponse = async (userMessage: string, apiKey?: string, customHistory
       model.name,
       conversationMessages,
       (chunk: string) => {
-        streamingMessage.value += chunk;
+        rawBuffer += chunk;
+        const parsed = parseThinkingFromRaw(rawBuffer);
+        streamingThinking.value = parsed.thinking;
+        streamingMessage.value = parsed.response;
+        isThinkingPhase.value = parsed.inThinking;
         scrollToBottom();
       },
       apiKey
     );
 
+    // Parse final content and build metadata
+    const finalParsed = parseThinkingFromRaw(rawBuffer);
+    const metaObj: Record<string, any> = {};
+    if (finalParsed.thinking) metaObj.thinking = finalParsed.thinking;
+    if (pendingSourceChunks.value.length > 0) metaObj.sources = pendingSourceChunks.value;
+
     // Save the complete assistant response to database
     const assistantMessage = await window.api.chat.addMessage({
       chatId: currentChat.value!.id,
       role: 'assistant',
-      content: streamingMessage.value,
+      content: finalParsed.response || rawBuffer,
+      metadata: Object.keys(metaObj).length > 0 ? JSON.stringify(metaObj) : undefined,
     });
 
     messages.value.push(assistantMessage);
     streamingMessage.value = '';
+    streamingThinking.value = '';
+    isThinkingPhase.value = false;
     isStreaming.value = false;
+    pendingSourceChunks.value = [];
     await scrollToBottom();
   } catch (error: any) {
     isStreaming.value = false;
     streamingMessage.value = '';
-    console.error('Error getting AI response:', error);
+    streamingThinking.value = '';
+    isThinkingPhase.value = false;
+    pendingSourceChunks.value = [];
     
     // Check if it's an API key error for OpenAI
     if (error.message?.includes('API key') && !apiKey) {
@@ -576,6 +685,98 @@ onMounted(async () => {
   margin-left: 2px;
   animation: blink 1s infinite;
   color: #18a058;
+}
+
+/* Thinking block */
+.thinking-block {
+  margin-bottom: 10px;
+  border: 1px solid #3a3a44;
+  border-radius: 6px;
+  overflow: hidden;
+  background: #1e1e26;
+}
+
+.thinking-summary {
+  padding: 6px 10px;
+  cursor: pointer;
+  user-select: none;
+  font-size: 12px;
+  color: #a0a0b0;
+  display: flex;
+  align-items: center;
+  list-style: none;
+}
+
+.thinking-summary::-webkit-details-marker { display: none; }
+
+.thinking-block[open] .thinking-summary {
+  border-bottom: 1px solid #3a3a44;
+}
+
+.thinking-content {
+  padding: 10px 12px;
+  font-size: 13px;
+  color: #8a8a9a;
+  max-height: 240px;
+  overflow-y: auto;
+  white-space: pre-wrap;
+}
+
+/* Sources block */
+.sources-block {
+  margin-top: 10px;
+  border: 1px solid #2e2e3a;
+  border-radius: 6px;
+  overflow: hidden;
+  background: #1c1c24;
+}
+
+.sources-summary {
+  padding: 6px 10px;
+  cursor: pointer;
+  user-select: none;
+  font-size: 12px;
+  color: #7a7a90;
+  display: flex;
+  align-items: center;
+  list-style: none;
+}
+
+.sources-summary::-webkit-details-marker { display: none; }
+
+.sources-block[open] .sources-summary {
+  border-bottom: 1px solid #2e2e3a;
+}
+
+.sources-list {
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.source-item {
+  background: #232330;
+  border-radius: 4px;
+  padding: 8px 10px;
+  border-left: 2px solid #4a4a60;
+}
+
+.source-label {
+  margin-bottom: 4px;
+  display: flex;
+  align-items: baseline;
+  gap: 2px;
+}
+
+.source-content {
+  font-size: 12px;
+  color: #8a8a9a;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 120px;
+  overflow-y: auto;
 }
 
 @keyframes blink {
