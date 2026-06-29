@@ -112,6 +112,7 @@ declare global {
           content: string;
           score: number;
         }>>;
+        onEmbedProgress: (callback: (data: { documentId: number; current: number; total: number }) => void) => () => void;
       };
     };
   }

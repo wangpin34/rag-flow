@@ -37,84 +37,96 @@ class VectorDatabaseService {
   private initializeSchema(): void {
     if (!this.db) throw new Error('Database not connected');
 
-    // Only drop and recreate if the OLD broken schema exists (had a named
-    // document_id PRIMARY KEY column). Do NOT drop unconditionally — that
-    // would wipe all stored embeddings on every app restart.
-    const existingDef = (this.db.prepare(
+    // Detect old schema variants and drop them so we can recreate cleanly.
+    const mapDef = (this.db.prepare(
+      "SELECT sql FROM sqlite_master WHERE name = 'vec_embeddings_map' AND type = 'table'"
+    ).get() as { sql: string } | undefined)?.sql ?? '';
+
+    const vecDef = (this.db.prepare(
       "SELECT sql FROM sqlite_master WHERE name = 'vec_embeddings' AND type = 'table'"
     ).get() as { sql: string } | undefined)?.sql ?? '';
 
-    if (existingDef.includes('document_id')) {
-      // Old schema — tear everything down so we can start fresh.
+    // Drop if old doc-level schema (has document_id but not chunk_id)
+    const isOldSchema = vecDef.includes('document_id') || (mapDef && !mapDef.includes('chunk_id'));
+    if (isOldSchema) {
       this.db.exec('DROP TABLE IF EXISTS vec_embeddings');
       this.db.exec('DROP TABLE IF EXISTS vec_embeddings_map');
-      console.log('⚠ Dropped old vec_embeddings schema (had named document_id column)');
+      console.log('⚠ Dropped old vec_embeddings schema (migrating to per-chunk embeddings)');
     }
 
     // sqlite-vec 0.1.x vec0: only plain INSERT supported (no explicit rowid,
-    // no UPSERT, no ON CONFLICT). We map document_id → vec rowid ourselves.
+    // no UPSERT, no ON CONFLICT). We map chunk_id → vec rowid ourselves.
     this.db.exec(`
       CREATE VIRTUAL TABLE IF NOT EXISTS vec_embeddings USING vec0(
         embedding FLOAT[768]
       );
     `);
 
-    // Companion table that maps Prisma document IDs to vec_embeddings rowids.
+    // Companion table: maps Prisma Chunk IDs → vec_embeddings rowids.
+    // document_id is stored for efficient bulk-delete when a document is removed.
     this.db.exec(`
       CREATE TABLE IF NOT EXISTS vec_embeddings_map (
-        document_id INTEGER PRIMARY KEY,
+        chunk_id    INTEGER PRIMARY KEY,
+        document_id INTEGER NOT NULL,
         vec_rowid   INTEGER NOT NULL
       );
+    `);
+    this.db.exec(`
+      CREATE INDEX IF NOT EXISTS vec_embeddings_map_doc_idx
+        ON vec_embeddings_map(document_id);
     `);
   }
 
   /**
-   * Insert or update a vector embedding for a document.
+   * Insert or update a vector embedding for a chunk.
    */
-  insertEmbedding(documentId: number, embedding: number[]): void {
+  insertEmbedding(chunkId: number, embedding: number[], documentId: number): void {
     if (!this.db) throw new Error('Database not connected');
 
     const embJson = JSON.stringify(embedding);
 
     // If a row already exists, delete the old vec row first.
     const existing = this.db.prepare(
-      'SELECT vec_rowid FROM vec_embeddings_map WHERE document_id = ?'
-    ).get(documentId) as { vec_rowid: number } | undefined;
+      'SELECT vec_rowid FROM vec_embeddings_map WHERE chunk_id = ?'
+    ).get(chunkId) as { vec_rowid: number } | undefined;
 
     if (existing) {
       this.db.prepare('DELETE FROM vec_embeddings WHERE rowid = ?').run(existing.vec_rowid);
-      this.db.prepare('DELETE FROM vec_embeddings_map WHERE document_id = ?').run(documentId);
+      this.db.prepare('DELETE FROM vec_embeddings_map WHERE chunk_id = ?').run(chunkId);
     }
 
-    // Plain INSERT — no explicit rowid, no conflict clause.
     this.db.prepare('INSERT INTO vec_embeddings(embedding) VALUES (?)').run(embJson);
     const vecRowid = (this.db.prepare('SELECT last_insert_rowid() AS r').get() as { r: number }).r;
-    this.db.prepare('INSERT INTO vec_embeddings_map(document_id, vec_rowid) VALUES (?, ?)').run(documentId, vecRowid);
+    this.db.prepare(
+      'INSERT INTO vec_embeddings_map(chunk_id, document_id, vec_rowid) VALUES (?, ?, ?)'
+    ).run(chunkId, documentId, vecRowid);
   }
 
   /**
-   * Batch insert multiple embeddings
+   * Batch insert multiple chunk embeddings inside a single transaction.
    */
-  insertEmbeddingsBatch(embeddings: Array<{ documentId: number; embedding: number[] }>): void {
+  insertEmbeddingsBatch(embeddings: Array<{ chunkId: number; documentId: number; embedding: number[] }>): void {
     if (!this.db) throw new Error('Database not connected');
 
-    const getMap = this.db.prepare('SELECT vec_rowid FROM vec_embeddings_map WHERE document_id = ?');
+    const getMap = this.db.prepare('SELECT vec_rowid FROM vec_embeddings_map WHERE chunk_id = ?');
     const delVec = this.db.prepare('DELETE FROM vec_embeddings WHERE rowid = ?');
-    const delMap = this.db.prepare('DELETE FROM vec_embeddings_map WHERE document_id = ?');
+    const delMap = this.db.prepare('DELETE FROM vec_embeddings_map WHERE chunk_id = ?');
     const insVec = this.db.prepare('INSERT INTO vec_embeddings(embedding) VALUES (?)');
     const lastId = this.db.prepare('SELECT last_insert_rowid() AS r');
-    const insMap = this.db.prepare('INSERT INTO vec_embeddings_map(document_id, vec_rowid) VALUES (?, ?)');
+    const insMap = this.db.prepare(
+      'INSERT INTO vec_embeddings_map(chunk_id, document_id, vec_rowid) VALUES (?, ?, ?)'
+    );
 
     const transaction = this.db.transaction((items: typeof embeddings) => {
       for (const item of items) {
-        const existing = getMap.get(item.documentId) as { vec_rowid: number } | undefined;
+        const existing = getMap.get(item.chunkId) as { vec_rowid: number } | undefined;
         if (existing) {
           delVec.run(existing.vec_rowid);
-          delMap.run(item.documentId);
+          delMap.run(item.chunkId);
         }
         insVec.run(JSON.stringify(item.embedding));
         const vecRowid = (lastId.get() as { r: number }).r;
-        insMap.run(item.documentId, vecRowid);
+        insMap.run(item.chunkId, item.documentId, vecRowid);
       }
     });
 
@@ -122,18 +134,17 @@ class VectorDatabaseService {
   }
 
   /**
-   * Search for similar documents using vector similarity
+   * Search for similar chunks using vector similarity.
+   * Returns chunk_id + document_id + distance for each hit.
    */
   searchSimilar(
     queryEmbedding: number[],
     limit: number = 10,
     maxDistance?: number
-  ): Array<{ document_id: number; distance: number }> {
+  ): Array<{ chunk_id: number; document_id: number; distance: number }> {
     if (!this.db) throw new Error('Database not connected');
 
-    // vec0 KNN queries MUST be a simple SELECT on the virtual table alone —
-    // JOINs inside the KNN query prevent the optimizer from using the index
-    // and return empty results. Run KNN first, then resolve document_ids.
+    // vec0 KNN queries MUST be a simple SELECT on the virtual table alone.
     const knnRows = this.db.prepare(`
       SELECT rowid, distance
       FROM vec_embeddings
@@ -144,36 +155,47 @@ class VectorDatabaseService {
     if (!knnRows.length) return [];
 
     const mapStmt = this.db.prepare(
-      'SELECT document_id FROM vec_embeddings_map WHERE vec_rowid = ?'
+      'SELECT chunk_id, document_id FROM vec_embeddings_map WHERE vec_rowid = ?'
     );
 
-    const results: Array<{ document_id: number; distance: number }> = [];
+    const results: Array<{ chunk_id: number; document_id: number; distance: number }> = [];
     for (const row of knnRows) {
       if (maxDistance !== undefined && row.distance > maxDistance) continue;
-      const mapped = mapStmt.get(row.rowid) as { document_id: number } | undefined;
-      if (mapped) results.push({ document_id: mapped.document_id, distance: row.distance });
+      const mapped = mapStmt.get(row.rowid) as { chunk_id: number; document_id: number } | undefined;
+      if (mapped) results.push({ chunk_id: mapped.chunk_id, document_id: mapped.document_id, distance: row.distance });
     }
     return results;
   }
 
   /**
-   * Get embedding for a specific document
+   * Get embedding for a specific chunk.
    */
-  getEmbedding(documentId: number): any {
+  getEmbedding(chunkId: number): any {
     if (!this.db) throw new Error('Database not connected');
 
     return this.db.prepare(`
-      SELECT m.document_id, v.embedding
+      SELECT m.chunk_id, v.embedding
       FROM vec_embeddings v
       JOIN vec_embeddings_map m ON m.vec_rowid = v.rowid
-      WHERE m.document_id = ?
-    `).get(documentId);
+      WHERE m.chunk_id = ?
+    `).get(chunkId);
   }
 
   /**
-   * Check if a document has an embedding
+   * Check if a chunk has an embedding.
    */
-  hasEmbedding(documentId: number): boolean {
+  hasEmbedding(chunkId: number): boolean {
+    if (!this.db) throw new Error('Database not connected');
+
+    return this.db.prepare(
+      'SELECT 1 FROM vec_embeddings_map WHERE chunk_id = ? LIMIT 1'
+    ).get(chunkId) !== undefined;
+  }
+
+  /**
+   * Check if any chunk of a document has been embedded.
+   */
+  hasDocumentEmbedding(documentId: number): boolean {
     if (!this.db) throw new Error('Database not connected');
 
     return this.db.prepare(
@@ -182,37 +204,39 @@ class VectorDatabaseService {
   }
 
   /**
-   * Delete an embedding
+   * Delete embedding for a single chunk.
    */
-  deleteEmbedding(documentId: number): void {
+  deleteEmbedding(chunkId: number): void {
     if (!this.db) throw new Error('Database not connected');
 
     const row = this.db.prepare(
-      'SELECT vec_rowid FROM vec_embeddings_map WHERE document_id = ?'
-    ).get(documentId) as { vec_rowid: number } | undefined;
+      'SELECT vec_rowid FROM vec_embeddings_map WHERE chunk_id = ?'
+    ).get(chunkId) as { vec_rowid: number } | undefined;
 
     if (row) {
       this.db.prepare('DELETE FROM vec_embeddings WHERE rowid = ?').run(row.vec_rowid);
-      this.db.prepare('DELETE FROM vec_embeddings_map WHERE document_id = ?').run(documentId);
+      this.db.prepare('DELETE FROM vec_embeddings_map WHERE chunk_id = ?').run(chunkId);
     }
   }
 
   /**
-   * Delete multiple embeddings
+   * Delete all chunk embeddings for one or more documents.
    */
   deleteEmbeddingsBatch(documentIds: number[]): void {
     if (!this.db) throw new Error('Database not connected');
 
-    const getMap = this.db.prepare('SELECT vec_rowid FROM vec_embeddings_map WHERE document_id = ?');
+    const getChunks = this.db.prepare(
+      'SELECT chunk_id, vec_rowid FROM vec_embeddings_map WHERE document_id = ?'
+    );
     const delVec = this.db.prepare('DELETE FROM vec_embeddings WHERE rowid = ?');
-    const delMap = this.db.prepare('DELETE FROM vec_embeddings_map WHERE document_id = ?');
+    const delMap = this.db.prepare('DELETE FROM vec_embeddings_map WHERE chunk_id = ?');
 
     const transaction = this.db.transaction((ids: number[]) => {
-      for (const id of ids) {
-        const row = getMap.get(id) as { vec_rowid: number } | undefined;
-        if (row) {
+      for (const docId of ids) {
+        const rows = getChunks.all(docId) as Array<{ chunk_id: number; vec_rowid: number }>;
+        for (const row of rows) {
           delVec.run(row.vec_rowid);
-          delMap.run(id);
+          delMap.run(row.chunk_id);
         }
       }
     });

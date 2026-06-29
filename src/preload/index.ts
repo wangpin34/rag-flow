@@ -122,8 +122,12 @@ const api = {
       ipcRenderer.invoke('collection:retrieve', collectionId, query, topK),
     retrieveChunks: (collectionId: number, query: string, topK: number) =>
       ipcRenderer.invoke('collection:retrieveChunks', collectionId, query, topK),
-  },
-};
+    onEmbedProgress: (callback: (data: { documentId: number; current: number; total: number }) => void) => {
+      const handler = (_: Electron.IpcRendererEvent, data: { documentId: number; current: number; total: number }) => callback(data);
+      ipcRenderer.on('collection:embedProgress', handler);
+      return () => ipcRenderer.removeListener('collection:embedProgress', handler);
+    },
+  },};
 
 // Use `contextBridge` APIs to expose Electron APIs to
 // renderer only if context isolation is enabled, otherwise

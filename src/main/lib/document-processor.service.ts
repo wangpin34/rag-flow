@@ -110,9 +110,13 @@ class DocumentProcessorService {
     return { chunkCount: chunkTexts.length };
   }
 
-  async embedDocument(documentId: number, embeddingModelId: number): Promise<void> {
-    const doc = await prismaService.db.document.findUnique({ where: { id: documentId } });
+  async embedDocument(documentId: number, embeddingModelId: number, onProgress?: (current: number, total: number) => void): Promise<void> {
+    const doc = await prismaService.db.document.findUnique({
+      where: { id: documentId },
+      include: { chunks: { orderBy: { chunkIndex: 'asc' } } },
+    });
     if (!doc) throw new Error(`Document ${documentId} not found`);
+    if (!doc.chunks.length) throw new Error(`Document ${documentId} has no chunks — parse it first`);
 
     const model = await prismaService.db.model.findUnique({
       where: { id: embeddingModelId },
@@ -121,21 +125,34 @@ class DocumentProcessorService {
     if (!model) throw new Error(`Embedding model ${embeddingModelId} not found`);
 
     const apiKey = model.provider.apiKey || (model.provider.apiKeyName ? process.env[model.provider.apiKeyName] : undefined);
-    const text = doc.content.slice(0, 8192);
-    const embedding = await providerApiService.generateEmbedding(
-      { name: model.provider.name, apiEndpoint: model.provider.apiEndpoint },
-      model.name,
-      text,
-      apiKey,
-    );
+    const providerInfo = { name: model.provider.name, apiEndpoint: model.provider.apiEndpoint };
 
-    vectorDatabaseService.insertEmbedding(documentId, embedding);
+    // Delete existing chunk embeddings for this document before re-embedding
+    vectorDatabaseService.deleteEmbeddingsBatch([documentId]);
+
+    // Embed each chunk individually
+    const chunkEmbeddings: Array<{ chunkId: number; documentId: number; embedding: number[] }> = [];
+    const total = doc.chunks.length;
+    for (let i = 0; i < total; i++) {
+      const chunk = doc.chunks[i];
+      const embedding = await providerApiService.generateEmbedding(
+        providerInfo,
+        model.name,
+        chunk.content,
+        apiKey,
+      );
+      chunkEmbeddings.push({ chunkId: chunk.id, documentId, embedding });
+      onProgress?.(i + 1, total);
+    }
+
+    vectorDatabaseService.insertEmbeddingsBatch(chunkEmbeddings);
 
     const meta = this._parseMeta(doc.metadata);
     Object.assign(meta, {
       embedded: true,
       embeddedAt: new Date().toISOString(),
       embeddingModelId,
+      embeddedChunks: doc.chunks.length,
       error: undefined,
     });
 
@@ -145,11 +162,11 @@ class DocumentProcessorService {
     });
   }
 
-  async processDocument(documentId: number, config: CollectionConfig): Promise<void> {
+  async processDocument(documentId: number, config: CollectionConfig, onProgress?: (documentId: number, current: number, total: number) => void): Promise<void> {
     try {
       await this.parseDocument(documentId, config.parser);
       if (config.embeddingModelId) {
-        await this.embedDocument(documentId, config.embeddingModelId);
+        await this.embedDocument(documentId, config.embeddingModelId, (current, total) => onProgress?.(documentId, current, total));
       }
     } catch (err: any) {
       const doc = await prismaService.db.document.findUnique({ where: { id: documentId } });
@@ -165,7 +182,7 @@ class DocumentProcessorService {
     }
   }
 
-  async processAll(collectionId: number, config: CollectionConfig): Promise<{ processed: number; errors: number }> {
+  async processAll(collectionId: number, config: CollectionConfig, onProgress?: (documentId: number, current: number, total: number) => void): Promise<{ processed: number; errors: number }> {
     const docs = await prismaService.db.document.findMany({
       where: { metadata: { contains: `"collectionId":${collectionId}` } },
       select: { id: true },
@@ -175,7 +192,7 @@ class DocumentProcessorService {
     let errors = 0;
     for (const doc of docs) {
       try {
-        await this.processDocument(doc.id, config);
+        await this.processDocument(doc.id, config, onProgress);
         processed++;
       } catch {
         errors++;

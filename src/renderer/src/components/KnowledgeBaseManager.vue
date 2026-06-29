@@ -318,7 +318,7 @@ import {
     useMessage,
     type DataTableColumns,
 } from 'naive-ui';
-import { computed, h, onMounted, ref, watch } from 'vue';
+import { computed, h, onMounted, onUnmounted, ref, watch } from 'vue';
 
 const message = useMessage();
 
@@ -339,6 +339,7 @@ const docsLoading = ref(false);
 const documents = ref<any[]>([]);
 const processingAll = ref(false);
 const processingDocIds = ref(new Set<number>());
+const embedProgress = ref(new Map<number, { current: number; total: number }>());
 const addFileInputRef = ref<HTMLInputElement | null>(null);
 
 // ── Chunks tab ──
@@ -617,11 +618,12 @@ const docColumns = computed<DataTableColumns<any>>(() => [
       h(NSpace, { size: 4 }, {
         default: () => {
           if (row.error) return [h(NTag, { size: 'small', type: 'error' }, { default: () => 'Error' })];
+          const progress = embedProgress.value.get(row.id);
           return [
             h(NTag, { size: 'small', type: row.parsed ? 'success' : 'default' },
               { default: () => row.parsed ? `${row.chunkCount} chunks` : 'Raw' }),
-            h(NTag, { size: 'small', type: row.embedded ? 'info' : 'default' },
-              { default: () => row.embedded ? 'Embedded' : 'No Vector' }),
+            h(NTag, { size: 'small', type: progress ? 'warning' : (row.embedded ? 'info' : 'default') },
+              { default: () => progress ? `${progress.current}/${progress.total}` : (row.embedded ? 'Embedded' : 'No Vector') }),
           ];
         },
       }),
@@ -648,5 +650,18 @@ const docColumns = computed<DataTableColumns<any>>(() => [
   },
 ]);
 
-onMounted(loadCollections);
+onMounted(() => {
+  loadCollections();
+  const cleanup = window.api.collection.onEmbedProgress(({ documentId, current, total }) => {
+    embedProgress.value = new Map(embedProgress.value).set(documentId, { current, total });
+    if (current === total) {
+      setTimeout(() => {
+        const next = new Map(embedProgress.value);
+        next.delete(documentId);
+        embedProgress.value = next;
+      }, 1500);
+    }
+  });
+  onUnmounted(cleanup);
+});
 </script>

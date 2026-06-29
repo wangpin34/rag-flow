@@ -101,16 +101,12 @@ app.whenReady().then(async () => {
   });
 
   // Vector database IPC handlers
-  ipcMain.handle('vector:insertEmbedding', async (_event, documentId: number, embedding: number[]) => {
-    return vectorDatabaseService.insertEmbedding(documentId, embedding);
-  });
-
   ipcMain.handle('vector:searchSimilar', async (_event, queryEmbedding: number[], limit: number) => {
     return vectorDatabaseService.searchSimilar(queryEmbedding, limit);
   });
 
   ipcMain.handle('vector:hasEmbedding', async (_event, documentId: number) => {
-    return vectorDatabaseService.hasEmbedding(documentId);
+    return vectorDatabaseService.hasDocumentEmbedding(documentId);
   });
 
   ipcMain.handle('vector:deleteEmbedding', async (_event, documentId: number) => {
@@ -361,16 +357,22 @@ app.whenReady().then(async () => {
     return documentProcessorService.parseDocument(documentId, parserConfig);
   });
 
-  ipcMain.handle('collection:embedDocument', async (_event, documentId: number, embeddingModelId: number) => {
-    return documentProcessorService.embedDocument(documentId, embeddingModelId);
+  ipcMain.handle('collection:embedDocument', async (event, documentId: number, embeddingModelId: number) => {
+    return documentProcessorService.embedDocument(documentId, embeddingModelId, (current, total) => {
+      event.sender.send('collection:embedProgress', { documentId, current, total });
+    });
   });
 
-  ipcMain.handle('collection:processDocument', async (_event, documentId: number, collectionConfig) => {
-    return documentProcessorService.processDocument(documentId, collectionConfig);
+  ipcMain.handle('collection:processDocument', async (event, documentId: number, collectionConfig) => {
+    return documentProcessorService.processDocument(documentId, collectionConfig, (docId, current, total) => {
+      event.sender.send('collection:embedProgress', { documentId: docId, current, total });
+    });
   });
 
-  ipcMain.handle('collection:processAll', async (_event, collectionId: number, collectionConfig) => {
-    return documentProcessorService.processAll(collectionId, collectionConfig);
+  ipcMain.handle('collection:processAll', async (event, collectionId: number, collectionConfig) => {
+    return documentProcessorService.processAll(collectionId, collectionConfig, (docId, current, total) => {
+      event.sender.send('collection:embedProgress', { documentId: docId, current, total });
+    });
   });
 
   ipcMain.handle('collection:delete', async (_event, id: number) => {
@@ -402,42 +404,40 @@ app.whenReady().then(async () => {
       apiKey,
     );
 
-    // 3. Vector search
+    // 3. Vector search — now returns chunk_id + document_id directly
     const hits = vectorDatabaseService.searchSimilar(queryEmbedding, topK);
 
     if (!hits.length) return [];
 
     // 4. Load chunk + document info for each hit.
-    // Embeddings are stored per-document. Return all chunks so the UI can
-    // show the full document context. Chunks are ordered by chunkIndex.
     const results = await Promise.all(
       hits.map(async (hit) => {
-        const doc = await prismaService.db.document.findUnique({
-          where: { id: hit.document_id },
-          include: { chunks: { orderBy: { chunkIndex: 'asc' } } },
+        const chunk = await prismaService.db.chunk.findUnique({
+          where: { id: hit.chunk_id },
+          include: { document: true },
         });
+        if (!chunk) return null;
 
-        const meta = doc?.metadata ? (() => { try { return JSON.parse(doc.metadata as string); } catch { return {}; } })() : {};
+        const meta = chunk.document?.metadata
+          ? (() => { try { return JSON.parse(chunk.document.metadata as string); } catch { return {}; } })()
+          : {};
 
         return {
           documentId: hit.document_id,
           score: hit.distance,
-          source: doc?.source ?? null,
-          chunkCount: doc?.chunks?.length ?? 0,
-          chunks: (doc?.chunks ?? []).map((c) => ({ id: c.id, chunkIndex: c.chunkIndex, content: c.content })),
-          // Fallback: if no chunks yet, return truncated raw content
-          chunkContent: doc?.chunks?.length
-            ? doc.chunks.map((c) => c.content).join('\n\n---\n\n')
-            : (doc?.content?.slice(0, 500) ?? ''),
+          source: chunk.document?.source ?? null,
+          chunkCount: 1,
+          chunks: [{ id: chunk.id, chunkIndex: chunk.chunkIndex, content: chunk.content }],
+          chunkContent: chunk.content,
           collectionId: (meta as any).collectionId ?? null,
         };
       })
     );
 
-    // Filter to only docs that belong to this collection.
-    // collectionId is stored in document metadata when the document was added;
-    // fall back to including the result if metadata is missing/unparseable.
-    return results.filter((r) => r.collectionId === null || r.collectionId === collectionId);
+    // Filter nulls and to only chunks belonging to this collection.
+    return results.filter(
+      (r): r is NonNullable<typeof r> => r !== null && (r.collectionId === null || r.collectionId === collectionId)
+    );
   });
 
   // Lightweight retrieve for chat context: returns top-K chunks as plain text strings.
@@ -472,18 +472,14 @@ app.whenReady().then(async () => {
 
     const chunks: Array<{ source: string | null; chunkIndex: number; content: string; score: number }> = [];
     for (const hit of hits) {
-      const doc = await prismaService.db.document.findUnique({
-        where: { id: hit.document_id },
-        include: { chunks: { orderBy: { chunkIndex: 'asc' } } },
+      const chunk = await prismaService.db.chunk.findUnique({
+        where: { id: hit.chunk_id },
+        include: { document: true },
       });
-      if (!doc) continue;
-      const meta = (() => { try { return JSON.parse(doc.metadata as string ?? '{}'); } catch { return {}; } })();
+      if (!chunk) continue;
+      const meta = (() => { try { return JSON.parse(chunk.document?.metadata as string ?? '{}'); } catch { return {}; } })();
       if (meta.collectionId !== undefined && meta.collectionId !== collectionId) continue;
-      // Return only the first chunk as the representative content for this document hit
-      const firstChunk = doc.chunks[0];
-      if (firstChunk) {
-        chunks.push({ source: doc.source, chunkIndex: firstChunk.chunkIndex, content: firstChunk.content, score: hit.distance });
-      }
+      chunks.push({ source: chunk.document?.source ?? null, chunkIndex: chunk.chunkIndex, content: chunk.content, score: hit.distance });
     }
     return chunks;
   });
