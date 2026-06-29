@@ -143,14 +143,32 @@ export class ProviderApiService {
     const endpoint = provider.apiEndpoint ?? (name === 'openai' ? 'https://api.openai.com/v1' : 'http://localhost:11434');
 
     if (name === 'ollama') {
-      const response = await fetch(`${endpoint}/api/embeddings`, {
+      // Normalize: strip a trailing /api so we always build the full path ourselves.
+      // The seeded endpoint is "http://localhost:11434/api", so without this we'd get
+      // ".../api/api/embed" which is 404.
+      const ollamaBase = endpoint.endsWith('/api') ? endpoint.slice(0, -4) : endpoint.replace(/\/$/, '');
+
+      // Try the current Ollama embed API (v0.2+: POST /api/embed, body: { model, input })
+      const response = await fetch(`${ollamaBase}/api/embed`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ model: modelName, input: text }),
+      });
+      if (response.ok) {
+        const data: any = await response.json();
+        // Response shape: { embeddings: number[][] }
+        const embeddings = data.embeddings ?? data.embedding;
+        return (Array.isArray(embeddings[0]) ? embeddings[0] : embeddings) as number[];
+      }
+      // Fall back to legacy endpoint (Ollama < 0.2: POST /api/embeddings, body: { model, prompt })
+      const legacy = await fetch(`${ollamaBase}/api/embeddings`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ model: modelName, prompt: text }),
       });
-      if (!response.ok) throw new Error(`Ollama embedding error: ${response.statusText}`);
-      const data: any = await response.json();
-      return data.embedding as number[];
+      if (!legacy.ok) throw new Error(`Ollama embedding error: ${legacy.statusText}`);
+      const legacyData: any = await legacy.json();
+      return legacyData.embedding as number[];
     }
 
     // OpenAI-compatible
